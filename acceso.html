@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ingresar al curso | Duvna Academy</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/duvna.css">
+  <script type="module" src="assets/js/app.js"></script>
+</head>
+<body>
+  <header id="site-header" class="site-header"></header>
+
+  <main class="form-page">
+    <div class="wrap">
+      <div class="form-intro">
+        <h1>Entrá a tu curso</h1>
+        <p>Usá el código de acceso que recibiste por email al inscribirte.</p>
+      </div>
+
+      <form class="form-card" id="form" novalidate>
+        <div id="msg" class="msg" role="status" aria-live="polite"></div>
+        <div class="field">
+          <label for="nombre">Tu nombre</label>
+          <input id="nombre" type="text" autocomplete="name" maxlength="60" required>
+        </div>
+        <div class="field">
+          <label for="codigo">Código de acceso</label>
+          <input id="codigo" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DUVNA-XXXX-XXXX" maxlength="30" required style="font-family:var(--mono);text-transform:uppercase">
+          <p class="hint">Lo encontrás en el email de confirmación de tu inscripción.</p>
+        </div>
+        <button class="btn btn-primary btn-block" id="entrar" type="submit">Entrar al curso</button>
+        <p class="small muted" style="margin:18px 0 0;text-align:center">¿Todavía no te inscribiste? <a href="aula.html">Mirá la primera clase gratis</a></p>
+      </form>
+    </div>
+  </main>
+
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <script type="module">
+    import { showMsg } from "./assets/js/app.js";
+    import { abrirCurso, guardarAcceso, accesoGuardado } from "./assets/js/aula.js";
+
+    const form = document.getElementById("form");
+    const msg = document.getElementById("msg");
+    const boton = document.getElementById("entrar");
+    const previo = accesoGuardado();
+    if (previo?.nombre) document.getElementById("nombre").value = previo.nombre;
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nombre = document.getElementById("nombre").value.trim();
+      const codigo = document.getElementById("codigo").value;
+      if (!nombre) return showMsg(msg, "err", "Escribí tu nombre.");
+      if (!codigo.trim()) return showMsg(msg, "err", "Escribí tu código de acceso.");
+
+      boton.disabled = true;
+      boton.textContent = "Verificando…";
+      try {
+        await abrirCurso(codigo);
+        guardarAcceso(codigo.trim().toUpperCase(), nombre);
+        location.href = "aula.html";
+      } catch (err) {
+        boton.disabled = false;
+        boton.textContent = "Entrar al curso";
+        showMsg(msg, "err", err.message === "codigo"
+          ? "Ese código no es válido. Revisalo en tu email, con guiones y sin espacios."
+          : "No pudimos cargar el curso. Revisá tu conexión y probá de nuevo.");
+      }
+    });
+  </script>
+</body>
+</html>

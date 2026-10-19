@@ -10,6 +10,9 @@ Sitio de cursos online de Duvna Academy: landings, cuentas de alumnos, clases pr
 
 ```
 index.html              Inicio de la academia
+aula.html               Aula: clase de muestra gratis y curso completo con código
+acceso.html             Ingreso con código de acceso
+assets/curso/           Índice, clase de muestra y curso cifrado
 cursos/roblox-luau.html Landing de venta del curso de Roblox
 legal/                  Términos, privacidad, reembolsos, arrepentimiento y baja
 404.html                Página de error
@@ -18,6 +21,14 @@ assets/js/app.js        Código compartido (encabezado, pie, precios, botones de
 assets/css/duvna.css    Estilos
 supabase/               Base de datos para cuando se sumen las cuentas
 ```
+
+## Aula (versión preview, sin base de datos)
+
+- `aula.html` muestra el curso. Sin código, se ve solo la **clase 1.1** de muestra; el resto aparece bloqueado.
+- `acceso.html` pide nombre y **código de acceso**. Con el código correcto se habilitan las 41 clases.
+- El curso está **cifrado** en `assets/curso/curso.enc.json` (AES-256). Aunque el repo sea público, sin el código no se puede leer.
+- El progreso de cada alumno (clases completadas) se guarda en su navegador.
+- Es un solo código para todos los alumnos: se lo mandás por email cuando pagan. Si se filtra, se genera un código nuevo y se vuelve a cifrar el curso (pedíselo a Claude).
 
 **Cuentas de alumnos, panel, clases y certificados** están guardados en la rama `login` del repositorio, listos para sumarlos más adelante. Por ahora la web es solo de venta:
 

@@ -76,6 +76,10 @@ export function authError(err) {
 }
 
 // ---------- Encabezado y pie comunes ----------
+function tieneAcceso() {
+  try { return !!JSON.parse(localStorage.getItem("duvna_acceso") || "null")?.codigo; } catch { return false; }
+}
+
 async function renderHeader() {
   const el = document.getElementById("site-header");
   if (!el) return;
@@ -88,8 +92,11 @@ async function renderHeader() {
       </a>
       <nav class="nav" aria-label="Principal">
         <a class="hide-sm" href="${BASE}cursos/roblox-luau.html">Curso de Roblox</a>
-        <a class="hide-sm" href="${BASE}cursos/roblox-luau.html#programa">Programa</a>
-        <a class="btn btn-primary btn-sm" data-buy="roblox-luau" href="${BASE}cursos/roblox-luau.html#precio">Inscribirme</a>
+        <a class="hide-sm" href="${BASE}aula.html">Clase gratis</a>
+        ${tieneAcceso()
+          ? `<a class="btn btn-primary btn-sm" href="${BASE}aula.html">Mi curso</a>`
+          : `<a href="${BASE}acceso.html">Ingresar</a>
+             <a class="btn btn-primary btn-sm hide-xs" data-buy="roblox-luau" href="${BASE}cursos/roblox-luau.html#precio">Inscribirme</a>`}
       </nav>
     </div>`;
 }
