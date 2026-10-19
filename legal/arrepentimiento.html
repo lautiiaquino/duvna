@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Botón de arrepentimiento | Duvna Academy</title>
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/duvna.css">
+  <script type="module" src="../assets/js/app.js"></script>
+</head>
+<body>
+  <header id="site-header" class="site-header"></header>
+  <main class="section">
+    <div class="wrap legal">
+      <h1>Botón de arrepentimiento</h1>
+      <p>Si contrataste una suscripción en los últimos 10 días corridos, podés revocarla con este formulario. No tenés que explicar por qué y no tiene costo. Te devolvemos el total pagado por el mismo medio de pago.</p>
+      <p class="muted">Si ya pasaron los 10 días y querés dejar de pagar, usá el <a href="../legal/baja.html">botón de baja</a>.</p>
+      <form id="req-form" class="form-card wide" style="margin:32px 0 0" novalidate>
+        <div id="msg" class="msg" role="status" aria-live="polite"></div>
+        <div class="field">
+          <label for="r-name">Nombre y apellido</label>
+          <input id="r-name" type="text" autocomplete="name" maxlength="80" required>
+        </div>
+        <div class="field">
+          <label for="r-email">Email con el que te registraste</label>
+          <input id="r-email" type="email" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="r-detail">Curso y fecha aproximada de la compra (opcional)</label>
+          <textarea id="r-detail" maxlength="2000"></textarea>
+        </div>
+        <button class="btn btn-dark" type="submit">Enviar pedido de arrepentimiento</button>
+      </form>
+      <script type="module">
+        import { supabase, requireBackend, showMsg, getSession } from "../assets/js/app.js";
+        const msg = document.getElementById("msg");
+        const form = document.getElementById("req-form");
+        const ready = requireBackend(msg);
+        const session = ready ? await getSession() : null;
+        if (session) document.getElementById("r-email").value = session.user.email;
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          if (!ready) return showMsg(msg, "err", "El formulario todavía no está conectado. Escribinos por email y lo resolvemos.");
+          const name = document.getElementById("r-name").value.trim();
+          const email = document.getElementById("r-email").value.trim();
+          const detail = document.getElementById("r-detail").value.trim();
+          if (!name || !email) return showMsg(msg, "err", "Completá tu nombre y tu email.");
+          const btn = form.querySelector("button");
+          btn.disabled = true;
+          const { data, error } = await supabase.rpc("submit_request", { p_type: "arrepentimiento", p_email: email, p_name: name, p_detail: detail });
+          btn.disabled = false;
+          if (error) return showMsg(msg, "err", error.message);
+          showMsg(msg, "ok", `Recibimos tu pedido de arrepentimiento. Tu código de constancia es ${data}. Guardalo: te vamos a escribir a tu email para confirmar el reintegro.`);
+          form.querySelectorAll("input, textarea, button").forEach(el => el.disabled = true);
+        });
+      </script>
+    </div>
+  </main>
+  <footer id="site-footer" class="site-footer"></footer>
+</body>
+</html>

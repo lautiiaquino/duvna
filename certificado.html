@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Certificado | Duvna Academy</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/duvna.css">
+  <style>
+    .diploma {
+      max-width: 1000px; margin: 0 auto; aspect-ratio: 1.414 / 1; background: #ffffff; color: #0f1a14; border: 1px solid #cfdcd3;
+      border-radius: 18px; outline: 3px solid #22c55e; outline-offset: -20px; box-shadow: 12px 12px 0 #d6e3da;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+      padding: 7% 9%; position: relative; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .diploma .org { display: inline-flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700; font-size: clamp(1rem, 2.2vw, 1.4rem); letter-spacing: -0.02em; }
+    .diploma .org .brand-mark { width: 30px; height: 30px; padding: 6px; }
+    .diploma .org .brand-mark span { background: #ffffff; }
+    .diploma .rule { width: 72px; height: 6px; border-radius: 3px; background: #22c55e; margin: 20px auto; }
+    .diploma .lead { color: #56645b; margin: 0 auto; }
+    .diploma .name { font-family: var(--display); font-weight: 800; letter-spacing: -0.035em; font-size: clamp(1.8rem, 5vw, 3.2rem); margin: 10px 0; line-height: 1.1; }
+    .diploma .diploma-course { font-weight: 800; font-size: clamp(1.05rem, 2.2vw, 1.4rem); margin: 6px auto 0; max-width: 34ch; }
+    .diploma .foot { display: flex; justify-content: space-between; width: 100%; margin-top: auto; padding-top: 28px; font-size: .85rem; text-align: left; gap: 16px; }
+    .diploma .sign { border-top: 2px solid #0f1a14; padding-top: 6px; min-width: 200px; font-weight: 700; }
+    .diploma .sign span { font-weight: 500; color: #56645b; }
+    .diploma .verify { font-family: var(--mono); font-size: .76rem; color: #56645b; text-align: right; }
+    .diploma .verify p { margin: 0 0 0 auto; }
+    .toolbar { display: flex; justify-content: center; gap: 12px; margin: 24px 0; }
+    @media print {
+      @page { size: A4 landscape; margin: 0; }
+      body { background: #fff; }
+      .site-header, .site-footer, .toolbar, #msg { display: none !important; }
+      .section { padding: 0 !important; }
+      .diploma { box-shadow: none; border-radius: 0; max-width: none; width: 100vw; height: 100vh; aspect-ratio: auto; }
+    }
+  </style>
+  <script type="module" src="assets/js/app.js"></script>
+</head>
+<body>
+  <header id="site-header" class="site-header"></header>
+  <main class="section">
+    <div class="wrap">
+      <div id="msg" class="msg" role="status" aria-live="polite"></div>
+      <div id="out"></div>
+      <div class="toolbar" id="toolbar" hidden>
+        <button class="btn btn-dark" type="button" onclick="window.print()">Imprimir o guardar en PDF</button>
+        <a class="btn btn-ghost" id="verify-link" href="#">Link de verificación</a>
+      </div>
+    </div>
+  </main>
+  <footer id="site-footer" class="site-footer"></footer>
+  <script type="module">
+    import { supabase, CONFIG, requireBackend, esc, fmtDate, showMsg } from "./assets/js/app.js";
+    const msg = document.getElementById("msg");
+    const code = (new URLSearchParams(location.search).get("codigo") || "").toUpperCase();
+    if (requireBackend(msg)) {
+      const { data } = await supabase.rpc("verify_certificate", { p_code: code });
+      if (!data?.length) {
+        showMsg(msg, "err", "No encontramos ese certificado. Revisá el código o buscalo desde tu panel.");
+      } else {
+        const c = data[0];
+        const verifyUrl = new URL(`verificar.html?codigo=${code}`, location.href).href;
+        document.getElementById("out").innerHTML = `
+          <section class="diploma" aria-label="Certificado de finalización">
+            <div class="org"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>duvna academy</div>
+            <div class="rule"></div>
+            <p class="lead">Certifica que</p>
+            <div class="name">${esc(c.full_name)}</div>
+            <p class="lead">completó todas las clases del curso</p>
+            <p class="diploma-course">${esc(c.course_title)}</p>
+            <div class="foot">
+              <div class="sign">${esc(CONFIG.TITULAR)}<br><span>Fundador, Duvna Academy</span></div>
+              <div class="verify"><p>Emitido el ${fmtDate(c.issued_at)}</p><p>Código ${esc(code)}</p><p>${esc(verifyUrl.replace(/^https?:\/\//, ""))}</p></div>
+            </div>
+          </section>
+          <p class="small muted" style="text-align:center;margin:28px auto 0">Certificado privado de finalización. No es un título oficial.</p>`;
+        document.getElementById("verify-link").href = verifyUrl;
+        document.getElementById("toolbar").hidden = false;
+      }
+    }
+  </script>
+</body>
+</html>

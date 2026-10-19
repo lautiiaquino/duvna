@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mi panel | Duvna Academy</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/duvna.css">
+  <script type="module" src="assets/js/app.js"></script>
+</head>
+<body>
+  <header id="site-header" class="site-header"></header>
+
+  <main class="section">
+    <div class="wrap">
+      <div class="panel-head">
+        <div>
+          <h1  id="hello">Mi panel</h1>
+          <p class="muted" style="margin:0" id="who"></p>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="logout" type="button">Cerrar sesión</button>
+      </div>
+
+      <div id="msg" class="msg" role="status" aria-live="polite"></div>
+
+      <div class="panel-grid">
+        <div id="courses"></div>
+
+        <aside>
+          <section class="box">
+            <h2>Mis datos</h2>
+            <form id="profile-form" novalidate>
+              <div class="field">
+                <label for="full-name">Nombre y apellido</label>
+                <input id="full-name" type="text" maxlength="80" autocomplete="name">
+                <p class="hint">Así va a figurar en tu certificado.</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" type="submit">Guardar nombre</button>
+            </form>
+          </section>
+
+          <section class="box">
+            <h2>Mis certificados</h2>
+            <div id="certs"><p class="muted small">Cuando termines un curso, tu certificado aparece acá.</p></div>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <script type="module">
+    import { supabase, CONFIG, requireBackend, requireSession, esc, fmtDate, showMsg } from "./assets/js/app.js";
+
+    const msg = document.getElementById("msg");
+    if (!requireBackend(msg)) throw new Error("Sin backend");
+    const session = await requireSession();
+    if (!session) throw new Error("Sin sesión");
+    const user = session.user;
+
+    document.getElementById("who").textContent = user.email;
+    document.getElementById("logout").onclick = async () => { await supabase.auth.signOut(); location.href = "./"; };
+
+    // ---- Perfil ----
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+    const nameInput = document.getElementById("full-name");
+    nameInput.value = profile?.full_name || "";
+    if (profile?.full_name) document.getElementById("hello").textContent = `Hola, ${profile.full_name.split(" ")[0]}`;
+
+    document.getElementById("profile-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const full_name = nameInput.value.trim();
+      if (full_name.length < 3) return showMsg(msg, "err", "Escribí tu nombre y apellido completos.");
+      const { error } = await supabase.from("profiles").update({ full_name }).eq("id", user.id);
+      if (error) return showMsg(msg, "err", "No se pudo guardar el nombre. Probá de nuevo.");
+      showMsg(msg, "ok", "Nombre guardado.");
+    });
+
+    // ---- Datos de cursos ----
+    const [{ data: enrollments }, { data: progress }, { data: certs }] = await Promise.all([
+      supabase.from("enrollments").select("*"),
+      supabase.from("progress").select("lesson_id"),
+      supabase.from("certificates").select("code, course_id, issued_at")
+    ]);
+    const done = new Set((progress || []).map(p => p.lesson_id));
+    const now = new Date();
+
+    // Compra iniciada desde una landing: lleva al pago de Mercado Pago.
+    const comprar = new URLSearchParams(location.search).get("comprar");
+    if (comprar && CONFIG.CURSOS[comprar]?.checkoutUrl) {
+      const already = (enrollments || []).some(e => e.course_id === comprar && e.status === "active");
+      if (!already) location.href = CONFIG.CURSOS[comprar].checkoutUrl;
+    }
+
+    const coursesEl = document.getElementById("courses");
+    const ids = Object.keys(CONFIG.CURSOS);
+    for (const id of ids) {
+      const info = CONFIG.CURSOS[id];
+      const enr = (enrollments || []).find(e => e.course_id === id);
+      const hasAccess = enr && ["active", "cancelled"].includes(enr.status) && new Date(enr.current_period_end) > now;
+      const { data: outline } = await supabase.rpc("course_outline", { p_course: id });
+      const total = outline?.length || 0;
+      const completed = (outline || []).filter(l => done.has(l.id)).length;
+      const pct = total ? Math.round((completed / total) * 100) : 0;
+      const nextLesson = (outline || []).find(l => !done.has(l.id)) || outline?.[0];
+      const cert = (certs || []).find(c => c.course_id === id);
+
+      let status = `<span class="badge badge-off">Sin suscripción</span>`;
+      if (hasAccess && enr.status === "active") status = `<span class="badge badge-ok">Activa</span>`;
+      if (hasAccess && enr.status === "cancelled") status = `<span class="badge badge-off">Dada de baja</span>`;
+
+      let detail = "";
+      if (enr && enr.status === "active") detail = `<dt>Próxima renovación</dt><dd>${fmtDate(enr.current_period_end)}</dd>`;
+      if (enr && enr.status === "cancelled") detail = `<dt>Acceso hasta</dt><dd>${fmtDate(enr.current_period_end)}</dd>`;
+
+      let actions = "";
+      if (hasAccess && nextLesson) {
+        actions += `<a class="btn btn-primary" href="clase.html?curso=${id}&clase=${nextLesson.id}">${completed ? "Seguir con el curso" : "Empezar el curso"}</a>`;
+      } else if (info.checkoutUrl) {
+        actions += `<a class="btn btn-primary" href="${esc(info.checkoutUrl)}">Suscribirme por ${esc(info.precio)} ${esc(info.periodo)}</a>`;
+      } else {
+        actions += `<span class="muted small">Las inscripciones abren pronto.</span>`;
+      }
+      if (!hasAccess && outline?.some(l => l.is_preview)) {
+        const prev = outline.find(l => l.is_preview);
+        actions += ` <a class="btn btn-ghost" href="clase.html?curso=${id}&clase=${prev.id}">Ver clase de muestra</a>`;
+      }
+      if (hasAccess && completed === total && total > 0 && !cert) {
+        actions += ` <button class="btn btn-primary" data-cert="${id}" type="button">Obtener mi certificado</button>`;
+      }
+
+      const bajaBtn = enr && enr.status === "active"
+        ? `<p class="small" style="margin-top:18px"><button class="btn btn-ghost btn-sm" data-baja="${id}" type="button">Dar de baja la suscripción</button></p>`
+        : "";
+
+      coursesEl.insertAdjacentHTML("beforeend", `
+        <section class="box course-box">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:start;flex-wrap:wrap">
+            <h2 style="margin:0">${esc(info.titulo)}</h2>${status}
+          </div>
+          <div class="progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
+          <p class="small muted">${completed} de ${total} clases completadas</p>
+          ${detail ? `<dl class="kv">${detail}</dl>` : ""}
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:18px">${actions}</div>
+          ${bajaBtn}
+        </section>`);
+    }
+
+    // ---- Certificados ----
+    function renderCerts(list) {
+      if (!list?.length) return;
+      document.getElementById("certs").innerHTML = list.map(c => `
+        <p style="margin:0 0 12px"><strong>${esc(CONFIG.CURSOS[c.course_id]?.titulo || c.course_id)}</strong><br>
+        <span class="small muted">Emitido el ${fmtDate(c.issued_at)}</span><br>
+        <a class="small" href="certificado.html?codigo=${encodeURIComponent(c.code)}">Ver e imprimir</a> ·
+        <a class="small" href="verificar.html?codigo=${encodeURIComponent(c.code)}">Link de verificación</a></p>`).join("");
+    }
+    renderCerts(certs);
+
+    coursesEl.addEventListener("click", async (e) => {
+      const certBtn = e.target.closest("[data-cert]");
+      if (certBtn) {
+        certBtn.disabled = true;
+        const { data, error } = await supabase.rpc("issue_certificate", { p_course: certBtn.dataset.cert });
+        if (error) { certBtn.disabled = false; return showMsg(msg, "err", error.message); }
+        location.href = `certificado.html?codigo=${encodeURIComponent(data)}`;
+      }
+      const bajaBtn = e.target.closest("[data-baja]");
+      if (bajaBtn) {
+        bajaBtn.disabled = true;
+        const curso = CONFIG.CURSOS[bajaBtn.dataset.baja]?.titulo || bajaBtn.dataset.baja;
+        const { data, error } = await supabase.rpc("submit_request", {
+          p_type: "baja", p_email: user.email, p_name: nameInput.value.trim(), p_detail: `Baja desde el panel: ${curso}`
+        });
+        if (error) { bajaBtn.disabled = false; return showMsg(msg, "err", error.message); }
+        showMsg(msg, "ok", `Recibimos tu pedido de baja. Código de constancia: ${data}. No se te va a volver a cobrar y conservás el acceso hasta el final del período que ya pagaste.`);
+        bajaBtn.closest("p").remove();
+      }
+    });
+  </script>
+</body>
+</html>

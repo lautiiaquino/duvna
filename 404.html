@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Página no encontrada | Duvna Academy</title>
+  <meta name="robots" content="noindex">
+  <script>
+    // GitHub muestra esta página en cualquier ruta inexistente: fijamos la raíz del sitio
+    // para que estilos y enlaces carguen bien (academy.duvna.com o usuario.github.io/duvna/).
+    (function () {
+      var parts = location.pathname.split("/");
+      var base = location.hostname.slice(-10) === "github.io" && parts[1] ? "/" + parts[1] + "/" : "/";
+      document.write('<base href="' + base + '">');
+    })();
+  </script>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/duvna.css">
+  <script type="module" src="assets/js/app.js"></script>
+</head>
+<body>
+  <header id="site-header" class="site-header"></header>
+  <main class="section">
+    <div class="wrap">
+      <h1>Esta página no existe</h1>
+      <p class="muted">Puede que el enlace esté mal escrito o que la página se haya movido.</p>
+      <p><a class="btn btn-dark" href="./">Ir al inicio</a> <a class="btn btn-ghost" href="panel.html">Ir a mi panel</a></p>
+    </div>
+  </main>
+  <footer id="site-footer" class="site-footer"></footer>
+</body>
+</html>
