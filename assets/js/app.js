@@ -79,7 +79,6 @@ export function authError(err) {
 async function renderHeader() {
   const el = document.getElementById("site-header");
   if (!el) return;
-  const session = await getSession();
   el.className = "site-header";
   el.innerHTML = `
     <div class="wrap">
@@ -89,10 +88,8 @@ async function renderHeader() {
       </a>
       <nav class="nav" aria-label="Principal">
         <a class="hide-sm" href="${BASE}cursos/roblox-luau.html">Curso de Roblox</a>
-        <a class="hide-sm" href="${BASE}verificar.html">Verificar certificado</a>
-        ${session
-          ? `<a class="btn btn-dark btn-sm" href="${BASE}panel.html">Mi panel</a>`
-          : `<a href="${BASE}ingresar.html">Ingresar</a>`}
+        <a class="hide-sm" href="${BASE}cursos/roblox-luau.html#programa">Programa</a>
+        <a class="btn btn-primary btn-sm" data-buy="roblox-luau" href="${BASE}cursos/roblox-luau.html#precio">Inscribirme</a>
       </nav>
     </div>`;
 }
@@ -114,8 +111,8 @@ function renderFooter() {
           <h3>Academia</h3>
           <ul>
             <li><a href="${BASE}cursos/roblox-luau.html">Curso de Roblox con Luau</a></li>
-            <li><a href="${BASE}verificar.html">Verificar un certificado</a></li>
-            <li><a href="${BASE}panel.html">Mi panel</a></li>
+            <li><a href="${BASE}cursos/roblox-luau.html#programa">Programa del curso</a></li>
+            <li><a href="${BASE}cursos/roblox-luau.html#precio">Precio y garantía</a></li>
           </ul>
         </div>
         <div>
@@ -149,20 +146,17 @@ function renderPrices() {
     const c = CONFIG.CURSOS[el.dataset.period];
     if (c) el.textContent = c.periodo;
   });
-  document.querySelectorAll("[data-buy]").forEach(async el => {
-    const id = el.dataset.buy;
-    const c = CONFIG.CURSOS[id];
+  document.querySelectorAll("[data-buy]").forEach(el => {
+    const c = CONFIG.CURSOS[el.dataset.buy];
     if (!c) return;
-    if (!c.checkoutUrl) {
-      // Mientras no haya link de pago, el botón invita a crear la cuenta y probar la clase gratis.
-      el.textContent = el.dataset.soon || "Probar la primera clase gratis";
-      el.href = `${BASE}ingresar.html?registro=1&next=${encodeURIComponent(BASE + "clase.html?curso=" + id)}`;
+    if (c.checkoutUrl) {
+      // Con el link de pago cargado, el botón lleva directo a Mercado Pago.
+      el.href = c.checkoutUrl;
       return;
     }
-    // Para comprar hace falta una cuenta: así el pago queda asociado al alumno.
-    el.href = `${BASE}ingresar.html?registro=1&next=${encodeURIComponent(BASE + "panel.html?comprar=" + id)}`;
-    const session = await getSession();
-    if (session) el.href = `${BASE}panel.html?comprar=${id}`;
+    // Mientras no haya link de pago, el botón abre un email para anotarse.
+    const asunto = encodeURIComponent(`Quiero inscribirme: ${c.titulo}`);
+    el.href = `mailto:${CONFIG.EMAIL_CONTACTO}?subject=${asunto}`;
   });
 }
 

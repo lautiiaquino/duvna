@@ -17,7 +17,6 @@
     <div class="wrap legal">
       <h1>Botón de baja</h1>
       <p>Pedí la baja de tu suscripción con este formulario. No tenés que explicar por qué. Desde la baja no se te cobra más y conservás el acceso hasta el final del período que ya pagaste.</p>
-      <p class="muted">Si tenés cuenta, también podés darte de baja con un clic desde <a href="../panel.html">tu panel</a>.</p>
       <form id="req-form" class="form-card wide" style="margin:32px 0 0" novalidate>
         <div id="msg" class="msg" role="status" aria-live="polite"></div>
         <div class="field">
@@ -35,20 +34,25 @@
         <button class="btn btn-dark" type="submit">Enviar pedido de baja</button>
       </form>
       <script type="module">
-        import { supabase, requireBackend, showMsg, getSession } from "../assets/js/app.js";
+        import { supabase, CONFIG, showMsg, getSession } from "../assets/js/app.js";
         const msg = document.getElementById("msg");
         const form = document.getElementById("req-form");
-        const ready = requireBackend(msg);
+        const ready = !!supabase;
         const session = ready ? await getSession() : null;
         if (session) document.getElementById("r-email").value = session.user.email;
 
         form.addEventListener("submit", async (e) => {
           e.preventDefault();
-          if (!ready) return showMsg(msg, "err", "El formulario todavía no está conectado. Escribinos por email y lo resolvemos.");
           const name = document.getElementById("r-name").value.trim();
           const email = document.getElementById("r-email").value.trim();
           const detail = document.getElementById("r-detail").value.trim();
           if (!name || !email) return showMsg(msg, "err", "Completá tu nombre y tu email.");
+          if (!ready) {
+            // Sin servidor conectado, el pedido sale por email al titular.
+            const body = `Nombre: ${name}\nEmail: ${email}\n\n${detail}`;
+            location.href = `mailto:${CONFIG.EMAIL_CONTACTO}?subject=${encodeURIComponent("Baja de suscripción")}&body=${encodeURIComponent(body)}`;
+            return showMsg(msg, "ok", `Se abrió tu correo con el pedido listo para enviar. Si no se abrió, escribí a ${CONFIG.EMAIL_CONTACTO} con el asunto "Baja de suscripción" y tu nombre. Te respondemos con la confirmación.`);
+          }
           const btn = form.querySelector("button");
           btn.disabled = true;
           const { data, error } = await supabase.rpc("submit_request", { p_type: "baja", p_email: email, p_name: name, p_detail: detail });

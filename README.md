@@ -10,20 +10,19 @@ Sitio de cursos online de Duvna Academy: landings, cuentas de alumnos, clases pr
 
 ```
 index.html              Inicio de la academia
-cursos/roblox-luau.html Landing del curso de Roblox
-ingresar.html           Ingreso y registro
-cuenta.html             Crear contraseña nueva (desde el email de recuperación)
-panel.html              Panel del alumno: cursos, progreso, certificados, baja
-clase.html              Visor de clases (solo entrega contenido si el servidor confirma el acceso)
-certificado.html        Certificado para imprimir o guardar en PDF
-verificar.html          Verificación pública de certificados por código
+cursos/roblox-luau.html Landing de venta del curso de Roblox
 legal/                  Términos, privacidad, reembolsos, arrepentimiento y baja
-assets/js/config.js     ← TUS DATOS: Supabase, titular, precios, links de pago
-assets/js/app.js        Código compartido (sesión, encabezado, pie)
+404.html                Página de error
+assets/js/config.js     ← TUS DATOS: titular, precios, link de pago, Supabase
+assets/js/app.js        Código compartido (encabezado, pie, precios, botones de compra)
 assets/css/duvna.css    Estilos
-supabase/schema.sql     Tablas, funciones y reglas de seguridad
-supabase/seed.sql       Curso de Roblox y su clase de muestra
+supabase/               Base de datos para cuando se sumen las cuentas
 ```
+
+**Cuentas de alumnos, panel, clases y certificados** están guardados en la rama `login` del repositorio, listos para sumarlos más adelante. Por ahora la web es solo de venta:
+
+- Los botones de compra llevan directo al link de pago de `config.js` (`checkoutUrl`). Mientras esté vacío, abren un email a `EMAIL_CONTACTO` para anotarse.
+- Los botones de arrepentimiento y baja arman un email con el pedido. Respondé cada uno con un código de constancia dentro de las 24 horas.
 
 ## Cómo funciona la protección
 
