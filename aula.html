@@ -26,24 +26,14 @@
         <p class="small muted" id="progreso-texto">Cargando…</p>
       </div>
       <div id="indice"></div>
-      <p style="padding:16px 22px 0" id="cert-link" hidden><a class="btn btn-primary btn-sm btn-block" href="certificado.html">Obtener mi certificado</a></p>
+      <p style="padding:16px 22px 0" id="cert-link" hidden></p>
       <p class="small" style="padding:18px 22px 0" id="sesion"></p>
     </nav>
 
     <main class="player-main">
-      <div id="aviso-muestra" class="aula-muestra" hidden>
-        <div>
-          <b>Estás viendo la clase de muestra.</b>
-          <span class="muted">Las otras 40 clases se habilitan con tu código de acceso.</span>
-        </div>
-        <div class="aula-muestra-acciones">
-          <a class="btn btn-primary btn-sm" data-buy="roblox-luau" href="cursos/roblox-luau.html#precio">Inscribirme</a>
-          <a class="btn btn-ghost btn-sm" href="acceso.html">Tengo un código</a>
-        </div>
-      </div>
-
+      <div id="aviso" class="aula-muestra" hidden></div>
       <div id="msg" class="msg" role="status" aria-live="polite"></div>
-      <article id="leccion" class="lesson-body lesson-protected"></article>
+      <article id="leccion" class="lesson-body lesson-protected"><p class="muted">Cargando la clase…</p></article>
       <span class="aula-marca" id="marca" aria-hidden="true"></span>
 
       <div class="lesson-actions" id="acciones" hidden>
@@ -57,136 +47,182 @@
   <footer id="site-footer" class="site-footer"></footer>
 
   <script type="module">
-    import { esc, showMsg } from "./assets/js/app.js";
-    import { cargarIndice, cargarMuestra, abrirCurso, accesoGuardado, cerrarSesion, progreso, marcar } from "./assets/js/aula.js";
+    import { supabase, requireBackend, esc, showMsg, fmtDate } from "./assets/js/app.js";
+    import { estadoAlumno, cargarClase, marcar, pedirCertificado, ultimaClase } from "./assets/js/aula.js";
 
-    const leccion = document.getElementById("leccion");
-    const msg = document.getElementById("msg");
-    const acceso = accesoGuardado();
+    async function main() {
+      const CURSO = "roblox-luau";
+      const leccion = document.getElementById("leccion");
+      const msg = document.getElementById("msg");
+      const aviso = document.getElementById("aviso");
+      if (!requireBackend(msg)) { leccion.innerHTML = ""; return; }
 
-    const indice = await cargarIndice();
-    const lista = indice.unidades.flatMap(u => u.clases.map(c => ({ ...c, unidad: u })));
-
-    // Con código: se abre el curso completo. Sin código: solo la muestra.
-    let clases = null;
-    if (acceso?.codigo) {
+      let est;
       try {
-        clases = await abrirCurso(acceso.codigo);
+        est = await estadoAlumno(CURSO);
       } catch {
-        cerrarSesion();
-        showMsg(msg, "err", "Tu código de acceso ya no es válido. Volvé a ingresar con el código actual.");
+        leccion.innerHTML = "";
+        showMsg(msg, "err", "No pudimos cargar el curso. Revisá tu conexión y recargá la página.");
+        return;
       }
-    }
-    const completo = !!clases;
-    if (!completo) {
-      const muestra = await cargarMuestra();
-      clases = { [muestra.id]: muestra.html };
-      document.getElementById("aviso-muestra").hidden = false;
-    }
+      const { session, perfil, outline, inscripcion, acceso } = est;
+      const hechas = est.hechas;
+      const idOf = (l) => `${l.module_no}-${l.position}`;
+      const porId = new Map(outline.map(l => [idOf(l), l]));
+      const muestra = outline.find(l => l.is_preview) || outline[0];
 
-    const sesion = document.getElementById("sesion");
-    if (completo) {
-      sesion.innerHTML = `Hola, ${esc(acceso.nombre)}. <a href="#" id="salir">Cerrar sesión</a>`;
-      document.getElementById("salir").onclick = (e) => { e.preventDefault(); cerrarSesion(); location.href = "aula.html"; };
-      document.getElementById("marca").textContent = `Material de ${acceso.nombre}. Duvna Academy`;
-    } else {
-      sesion.innerHTML = `<a href="acceso.html">Ingresar con mi código</a>`;
-    }
-
-    function pintarIndice(actual) {
-      const hechas = progreso();
-      let html = "";
-      for (const u of indice.unidades) {
-        html += `<div class="mod">Unidad ${u.num}: ${esc(u.titulo)}</div>`;
-        for (const c of u.clases) {
-          const abierta = !!clases[c.id];
-          const cls = [hechas.has(c.id) && abierta ? "done" : "", abierta ? "" : "bloqueada"].join(" ").trim();
-          html += `<a class="${cls}" href="#${c.id}" ${c.id === actual ? 'aria-current="page"' : ""}>`
-            + `${abierta ? "" : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'}`
-            + `<span>${c.id.replace("-", ".")} ${esc(c.titulo)}</span></a>`;
-        }
-      }
-      document.getElementById("indice").innerHTML = html;
-      const total = completo ? lista.length : 1;
-      const n = lista.filter(c => clases[c.id] && hechas.has(c.id)).length;
-      document.getElementById("barra").style.width = `${Math.round((n / total) * 100)}%`;
-      document.getElementById("cert-link").hidden = !(completo && n === total);
-      document.getElementById("progreso-texto").textContent = completo
-        ? `${n} de ${total} clases completadas`
-        : "Clase de muestra gratis";
-    }
-
-    function mostrar(id) {
-      if (!lista.some(c => c.id === id)) id = indice.muestra;
-      const pos = lista.findIndex(c => c.id === id);
-      const clase = lista[pos];
-      const html = clases[id];
-      pintarIndice(id);
-      document.title = `${clase.titulo} | Duvna Academy`;
-
-      if (!html) {
-        leccion.classList.remove("lesson-protected");
-        leccion.innerHTML = `<div class="locked">
-          <p class="small muted" style="margin:0">Unidad ${clase.unidad.num}: ${esc(clase.unidad.titulo)}</p>
-          <h1 style="margin-top:10px">${esc(clase.titulo)}</h1>
-          <p class="muted">Esta clase es parte del curso completo. Inscribite para recibir tu código de acceso y desbloquear las 41 clases.</p>
-          <p style="display:flex;flex-wrap:wrap;gap:10px;margin:0">
-            <a class="btn btn-primary" data-buy="roblox-luau" href="cursos/roblox-luau.html#precio">Inscribirme</a>
-            <a class="btn btn-ghost" href="acceso.html">Tengo un código</a>
-          </p></div>`;
-        document.getElementById("acciones").hidden = true;
-        refrescarBotonesCompra();
-        window.scrollTo(0, 0);
+      if (!outline.length) {
+        leccion.innerHTML = `<div class="locked"><h1>El curso se está cargando</h1><p class="muted">Las clases todavía no están disponibles. Volvé en unos minutos.</p></div>`;
         return;
       }
 
-      leccion.classList.add("lesson-protected");
-      leccion.innerHTML = `<p class="small muted" style="margin:0">Unidad ${clase.unidad.num}: ${esc(clase.unidad.titulo)}</p>
-        <h1>Clase ${id.replace("-", ".")}: ${esc(clase.titulo)}</h1>${html}`;
+      // ---------- Aviso según el estado del alumno ----------
+      const inscribirme = `<a class="btn btn-primary btn-sm" href="inscripcion.html?curso=${CURSO}">Inscribirme</a>`;
+      if (!session) {
+        aviso.innerHTML = `<div><b>Estás viendo la clase de muestra.</b><span class="muted">Inscribite para desbloquear las ${outline.length} clases.</span></div>
+          <div class="aula-muestra-acciones">${inscribirme}<a class="btn btn-ghost btn-sm" href="ingresar.html?next=aula.html">Ingresar</a></div>`;
+        aviso.hidden = false;
+      } else if (!acceso) {
+        const vencio = inscripcion && new Date(inscripcion.current_period_end) <= new Date();
+        aviso.innerHTML = `<div><b>${vencio ? "Tu suscripción venció." : "Todavía no tenés el curso completo."}</b><span class="muted">${vencio
+            ? "Renovala para volver a ver todas las clases. Tu progreso sigue guardado."
+            : "Si ya pagaste, tu acceso se habilita dentro de las 24 horas. Si no, inscribite para desbloquear todas las clases."}</span></div>
+          <div class="aula-muestra-acciones">${inscribirme}</div>`;
+        aviso.hidden = false;
+      }
 
-      const acciones = document.getElementById("acciones");
-      acciones.hidden = false;
-      const ant = lista[pos - 1], sig = lista[pos + 1];
-      const aAnt = document.getElementById("anterior");
-      const aSig = document.getElementById("siguiente");
-      aAnt.style.visibility = ant ? "visible" : "hidden";
-      if (ant) aAnt.href = `#${ant.id}`;
-      if (sig && !completo) { aSig.href = `inscripcion.html?curso=roblox-luau`; aSig.textContent = "Quiero el curso completo"; }
-      else if (sig) { aSig.href = `#${sig.id}`; aSig.textContent = "Siguiente clase"; }
-      else { aSig.href = "certificado.html"; aSig.textContent = "Ver mi certificado"; }
+      const sesion = document.getElementById("sesion");
+      if (session) {
+        const nombre = perfil?.full_name || session.user.email;
+        sesion.innerHTML = `Hola, ${esc(nombre.split(" ")[0])}. <a href="#" id="salir">Cerrar sesión</a>`
+          + (inscripcion && acceso && !perfil?.is_admin ? `<br><span class="muted">Acceso hasta el ${fmtDate(inscripcion.current_period_end)}</span>` : "");
+        document.getElementById("salir").onclick = async (e) => { e.preventDefault(); await supabase.auth.signOut(); location.href = "aula.html"; };
+        document.getElementById("marca").textContent = `Material de ${nombre}. Duvna Academy`;
+      } else {
+        sesion.innerHTML = `<a href="ingresar.html?next=aula.html">Ingresar</a> · <a href="ingresar.html?registro=1&next=aula.html">Crear cuenta</a>`;
+      }
 
-      leccion.querySelectorAll(".hl").forEach(bloque => {
-        const copiar = document.createElement("button");
-        copiar.type = "button";
-        copiar.className = "copiar";
-        copiar.textContent = "Copiar";
-        copiar.onclick = async () => {
-          const texto = bloque.querySelector("pre").innerText;
-          try { await navigator.clipboard.writeText(texto); copiar.textContent = "Copiado"; }
-          catch { copiar.textContent = "Seleccioná y copiá"; }
-          setTimeout(() => (copiar.textContent = "Copiar"), 1800);
-        };
-        bloque.appendChild(copiar);
-      });
-      if (completo) { try { localStorage.setItem("duvna_ultima", id); } catch {} }
+      // ---------- Índice y progreso ----------
+      const abierta = (l) => acceso || l.is_preview;
+      const CANDADO = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 
-      const boton = document.getElementById("hecho");
-      const pintar = () => { boton.textContent = progreso().has(id) ? "Completada ✓" : "Marcar como completada"; };
-      pintar();
-      boton.onclick = () => { marcar(id, !progreso().has(id)); pintar(); pintarIndice(id); };
-      window.scrollTo(0, 0);
+      function pintarIndice(actual) {
+        let html = "", ultimoMod = null;
+        for (const l of outline) {
+          if (l.module_no !== ultimoMod) { html += `<div class="mod">Unidad ${l.module_no}: ${esc(l.module_title)}</div>`; ultimoMod = l.module_no; }
+          const cls = [abierta(l) && hechas.has(l.id) ? "done" : "", abierta(l) ? "" : "bloqueada"].join(" ").trim();
+          html += `<a class="${cls}" href="#${idOf(l)}" ${idOf(l) === actual ? 'aria-current="page"' : ""}>${abierta(l) ? "" : CANDADO}<span>${l.module_no}.${l.position} ${esc(l.title)}</span></a>`;
+        }
+        document.getElementById("indice").innerHTML = html;
+
+        const total = outline.length;
+        const n = outline.filter(l => hechas.has(l.id)).length;
+        document.getElementById("barra").style.width = `${acceso ? Math.round((n / total) * 100) : 0}%`;
+        document.getElementById("progreso-texto").textContent = acceso ? `${n} de ${total} clases completadas` : "Clase de muestra gratis";
+
+        const certLink = document.getElementById("cert-link");
+        if (est.certificado) {
+          certLink.innerHTML = `<a class="btn btn-ghost btn-sm btn-block" href="certificado.html?codigo=${est.certificado}">Ver mi certificado</a>`;
+          certLink.hidden = false;
+        } else if (acceso && n === total) {
+          certLink.innerHTML = `<button class="btn btn-primary btn-sm btn-block" id="pedir-cert" type="button">Obtener mi certificado</button>`;
+          certLink.hidden = false;
+          document.getElementById("pedir-cert").onclick = obtenerCertificado;
+        } else {
+          certLink.hidden = true;
+        }
+      }
+
+      async function obtenerCertificado() {
+        try {
+          const codigo = await pedirCertificado(CURSO);
+          location.href = `certificado.html?codigo=${codigo}`;
+        } catch (err) {
+          showMsg(msg, "err", err.message);
+          window.scrollTo(0, 0);
+        }
+      }
+
+      // ---------- Mostrar una clase ----------
+      async function mostrar(id) {
+        const meta = porId.get(id) || muestra;
+        id = idOf(meta);
+        const pos = outline.indexOf(meta);
+        pintarIndice(id);
+        document.title = `${meta.title} | Duvna Academy`;
+        msg.className = "msg"; msg.textContent = "";
+
+        const clase = abierta(meta) ? await cargarClase(meta.id) : null;
+        const acciones = document.getElementById("acciones");
+
+        if (!clase) {
+          leccion.classList.remove("lesson-protected");
+          leccion.innerHTML = `<div class="locked">
+            <p class="small muted" style="margin:0">Unidad ${meta.module_no}: ${esc(meta.module_title)}</p>
+            <h1 style="margin-top:10px">${esc(meta.title)}</h1>
+            <p class="muted">Esta clase es parte del curso completo. Inscribite para desbloquear las ${outline.length} clases.</p>
+            <p style="display:flex;flex-wrap:wrap;gap:10px;margin:0">
+              <a class="btn btn-primary" href="inscripcion.html?curso=${CURSO}">Inscribirme</a>
+              ${session ? "" : '<a class="btn btn-ghost" href="ingresar.html?next=aula.html">Ya tengo cuenta</a>'}
+            </p></div>`;
+          acciones.hidden = true;
+          window.scrollTo(0, 0);
+          return;
+        }
+
+        leccion.classList.add("lesson-protected");
+        leccion.innerHTML = `<p class="small muted" style="margin:0">Unidad ${meta.module_no}: ${esc(meta.module_title)}</p>
+          <h1>Clase ${meta.module_no}.${meta.position}: ${esc(meta.title)}</h1>${clase.body_html}`;
+
+        // Botón para copiar cada bloque de código
+        leccion.querySelectorAll(".hl").forEach(bloque => {
+          const copiar = document.createElement("button");
+          copiar.type = "button"; copiar.className = "copiar"; copiar.textContent = "Copiar";
+          copiar.onclick = async () => {
+            try { await navigator.clipboard.writeText(bloque.querySelector("pre").innerText); copiar.textContent = "Copiado"; }
+            catch { copiar.textContent = "Seleccioná y copiá"; }
+            setTimeout(() => (copiar.textContent = "Copiar"), 1800);
+          };
+          bloque.appendChild(copiar);
+        });
+        if (acceso) ultimaClase(id);
+
+        acciones.hidden = false;
+        const ant = outline[pos - 1], sig = outline[pos + 1];
+        const aAnt = document.getElementById("anterior"), aSig = document.getElementById("siguiente");
+        aAnt.style.visibility = ant ? "visible" : "hidden";
+        if (ant) aAnt.href = `#${idOf(ant)}`;
+        if (sig && !acceso) { aSig.href = `inscripcion.html?curso=${CURSO}`; aSig.textContent = "Quiero el curso completo"; }
+        else if (sig) { aSig.href = `#${idOf(sig)}`; aSig.textContent = "Siguiente clase"; }
+        else { aSig.href = est.certificado ? `certificado.html?codigo=${est.certificado}` : "#"; aSig.textContent = "Terminaste el curso"; }
+
+        const boton = document.getElementById("hecho");
+        if (!session) {
+          boton.textContent = "Creá tu cuenta para guardar tu progreso";
+          boton.onclick = () => (location.href = "ingresar.html?registro=1&next=aula.html");
+        } else {
+          const pintar = () => { boton.textContent = hechas.has(meta.id) ? "Completada ✓" : "Marcar como completada"; };
+          pintar();
+          boton.onclick = async () => {
+            boton.disabled = true;
+            const nuevo = !hechas.has(meta.id);
+            if (await marcar(session.user.id, meta.id, nuevo)) {
+              nuevo ? hechas.add(meta.id) : hechas.delete(meta.id);
+            } else {
+              showMsg(msg, "err", "No se pudo guardar tu progreso. Probá de nuevo.");
+            }
+            boton.disabled = false; pintar(); pintarIndice(id);
+          };
+        }
+        window.scrollTo(0, 0);
+      }
+
+      leccion.addEventListener("contextmenu", (e) => { if (!e.target.closest("pre")) e.preventDefault(); });
+      window.addEventListener("hashchange", () => mostrar(location.hash.slice(1)));
+      const ultima = acceso ? ultimaClase() : null;
+      mostrar(location.hash.slice(1) || ultima || idOf(muestra));
     }
-
-    // Los botones de compra que se agregan después necesitan su destino real
-    function refrescarBotonesCompra() {
-      const original = document.querySelector('.aula-muestra [data-buy]');
-      document.querySelectorAll('.locked [data-buy]').forEach(b => { if (original) b.href = original.href; });
-    }
-
-    leccion.addEventListener("contextmenu", (e) => { if (!e.target.closest("pre")) e.preventDefault(); });
-    window.addEventListener("hashchange", () => mostrar(location.hash.slice(1)));
-    const ultima = (() => { try { return localStorage.getItem("duvna_ultima"); } catch { return null; } })();
-    mostrar(location.hash.slice(1) || (completo && ultima) || indice.muestra);
+    main();
   </script>
 </body>
 </html>

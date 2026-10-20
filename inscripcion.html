@@ -22,29 +22,13 @@
     <div class="wrap insc">
       <div class="insc-main">
         <h1>Tu inscripción</h1>
-        <p class="muted">Tres pasos y empezás. Te mandamos tu código de acceso dentro de las <span id="horas">24</span> horas de confirmado el pago.</p>
+        <p class="muted">Tres pasos y empezás. Habilitamos tu acceso dentro de las <span id="horas">24</span> horas de confirmado el pago, y te avisamos por email.</p>
 
         <ol class="insc-pasos">
           <li class="insc-paso" id="paso1">
-            <h2>Tus datos</h2>
-            <form id="datos" novalidate>
-              <div id="msg" class="msg" role="status" aria-live="polite"></div>
-              <div class="field">
-                <label for="nombre">Nombre y apellido</label>
-                <input id="nombre" type="text" autocomplete="name" maxlength="80" required>
-                <p class="hint">Así va a figurar en tu certificado.</p>
-              </div>
-              <div class="field">
-                <label for="email">Email</label>
-                <input id="email" type="email" autocomplete="email" required>
-                <p class="hint">Ahí te mandamos tu código de acceso.</p>
-              </div>
-              <label class="check">
-                <input id="terminos" type="checkbox" required>
-                <span>Leí y acepto los <a href="legal/terminos.html" target="_blank">términos y condiciones</a>, la <a href="legal/privacidad.html" target="_blank">política de privacidad</a> y la <a href="legal/reembolsos.html" target="_blank">política de reembolsos</a>. Si soy menor de 18 años, cuento con la autorización de mi madre, padre o tutor, que es quien realiza el pago.</span>
-              </label>
-              <button class="btn btn-primary btn-block" type="submit">Continuar al pago</button>
-            </form>
+            <h2>Tu cuenta</h2>
+            <div id="msg" class="msg" role="status" aria-live="polite"></div>
+            <div id="cuenta"><p class="muted">Cargando…</p></div>
           </li>
 
           <li class="insc-paso" id="paso2" aria-disabled="true">
@@ -81,7 +65,7 @@
   <footer id="site-footer" class="site-footer"></footer>
 
   <script type="module">
-    import { CONFIG, esc, showMsg, linkMensaje, linkEmail, linkWhatsApp } from "./assets/js/app.js";
+    import { CONFIG, supabase, esc, showMsg, requireBackend, getSession, getPerfil, linkMensaje } from "./assets/js/app.js";
 
     const id = new URLSearchParams(location.search).get("curso") || "roblox-luau";
     const curso = CONFIG.CURSOS[id] || CONFIG.CURSOS["roblox-luau"];
@@ -94,47 +78,71 @@
       p.setAttribute("aria-disabled", String(i + 1 > n));
       p.classList.toggle("hecho", i + 1 < n);
     });
-
-    // Recordar los datos mientras completa la inscripción
-    const guardado = (() => { try { return JSON.parse(sessionStorage.getItem("duvna_insc") || "{}"); } catch { return {}; } })();
-    if (guardado.nombre) document.getElementById("nombre").value = guardado.nombre;
-    if (guardado.email) document.getElementById("email").value = guardado.email;
-
-    document.getElementById("datos").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const nombre = document.getElementById("nombre").value.trim();
-      const email = document.getElementById("email").value.trim();
-      if (nombre.length < 3) return showMsg(msg, "err", "Escribí tu nombre y apellido.");
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showMsg(msg, "err", "Revisá tu email: tiene que tener la forma nombre@ejemplo.com.");
-      if (!document.getElementById("terminos").checked) return showMsg(msg, "err", "Para seguir tenés que aceptar los términos y las políticas.");
-      msg.className = "msg"; msg.textContent = "";
-      try { sessionStorage.setItem("duvna_insc", JSON.stringify({ nombre, email })); } catch {}
-
-      const detalle = `Nombre: ${nombre}\nEmail: ${email}\nCurso: ${curso.titulo}\nPrecio: ${curso.precio} ${curso.periodo}`;
-      const pago = document.getElementById("pago");
-      const confirmar = document.getElementById("confirmar");
-
-      if (curso.checkoutUrl) {
-        pago.innerHTML = `
-          <p class="muted">Se abre Mercado Pago en otra pestaña. Podés pagar con tarjeta, dinero en cuenta u otros medios que ofrezca Mercado Pago.</p>
-          <a class="btn btn-primary btn-lg" id="ir-pago" href="${esc(curso.checkoutUrl)}" target="_blank" rel="noopener">Pagar ${esc(curso.precio)} con Mercado Pago</a>`;
-        confirmar.innerHTML = `
-          <p class="muted">Cuando termines de pagar, avisanos así te mandamos tu código de acceso. Si podés, adjuntá el comprobante.</p>
-          <a class="btn btn-ghost" href="${linkMensaje("Ya pagué mi inscripción", detalle)}" target="_blank" rel="noopener">Avisar que ya pagué</a>`;
-        activar(2);
-        document.getElementById("ir-pago").addEventListener("click", () => activar(3));
-      } else {
-        pago.innerHTML = `
-          <p class="muted">Estamos terminando de habilitar el pago online. Mandanos tu pedido y te respondemos con el link de pago de Mercado Pago dentro de las ${CONFIG.HORAS_RESPUESTA} horas.</p>
-          <a class="btn btn-primary btn-lg" id="ir-pago" href="${linkMensaje("Quiero inscribirme", detalle)}" target="_blank" rel="noopener">Enviar mi pedido de inscripción</a>`;
-        confirmar.innerHTML = `<p class="muted">Cuando se acredite el pago, te llega a <b>${esc(email)}</b> tu código de acceso. Con ese código entrás al curso desde <a href="acceso.html">Ingresar</a>.</p>`;
-        activar(2);
-        document.getElementById("ir-pago").addEventListener("click", () => activar(3));
-      }
-      pasos[1].scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-
     activar(1);
+
+    const cuenta = document.getElementById("cuenta");
+    const volver = encodeURIComponent(`inscripcion.html?curso=${id}`);
+    const listo = requireBackend(msg);
+    const session = listo ? await getSession() : null;
+    const perfil = session ? await getPerfil() : null;
+
+    if (!listo) {
+      cuenta.innerHTML = "";
+    } else if (!session) {
+      cuenta.innerHTML = `
+        <p class="muted">Para inscribirte necesitás una cuenta: ahí vas a ver el curso y tu progreso.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">
+          <a class="btn btn-primary" href="ingresar.html?registro=1&next=${volver}">Crear mi cuenta</a>
+          <a class="btn btn-ghost" href="ingresar.html?next=${volver}">Ya tengo cuenta</a>
+        </div>`;
+    } else {
+      const nombre = perfil?.full_name || "";
+      const email = session.user.email;
+      cuenta.innerHTML = `
+        <p>Te inscribís como <b>${esc(nombre || email)}</b> (${esc(email)}).</p>
+        <form id="datos" novalidate>
+          <label class="check">
+            <input id="terminos" type="checkbox" required>
+            <span>Leí y acepto los <a href="legal/terminos.html" target="_blank">términos y condiciones</a>, la <a href="legal/privacidad.html" target="_blank">política de privacidad</a> y la <a href="legal/reembolsos.html" target="_blank">política de reembolsos</a>. Si soy menor de 18 años, cuento con la autorización de mi madre, padre o tutor, que es quien realiza el pago.</span>
+          </label>
+          <button class="btn btn-primary btn-block" type="submit">Continuar al pago</button>
+        </form>`;
+
+      document.getElementById("datos").addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (!document.getElementById("terminos").checked) return showMsg(msg, "err", "Para seguir tenés que aceptar los términos y las políticas.");
+        msg.className = "msg"; msg.textContent = "";
+        const detalle = `Curso: ${curso.titulo}\nPrecio: ${curso.precio} ${curso.periodo}`;
+        const pago = document.getElementById("pago");
+
+        pago.innerHTML = curso.checkoutUrl
+          ? `<p class="muted">Se abre Mercado Pago en otra pestaña. Pagá con el mismo email de tu cuenta si podés, así lo encontramos más rápido.</p>
+             <a class="btn btn-primary btn-lg" id="ir-pago" href="${esc(curso.checkoutUrl)}" target="_blank" rel="noopener">Pagar ${esc(curso.precio)} con Mercado Pago</a>`
+          : `<p class="muted">Estamos terminando de habilitar el pago online. Registrá tu pedido en el paso 3 y te mandamos el link de pago de Mercado Pago dentro de las ${CONFIG.HORAS_RESPUESTA} horas.</p>`;
+        activar(curso.checkoutUrl ? 2 : 3);
+        if (curso.checkoutUrl) document.getElementById("ir-pago").addEventListener("click", () => activar(3));
+
+        const confirmar = document.getElementById("confirmar");
+        confirmar.innerHTML = `
+          <p class="muted">${curso.checkoutUrl ? "Cuando termines de pagar, registrá tu inscripción. Revisamos el pago y habilitamos tu acceso." : "Registrá tu pedido y te contactamos por email."}</p>
+          <button class="btn ${curso.checkoutUrl ? "btn-ghost" : "btn-primary"}" id="registrar" type="button">${curso.checkoutUrl ? "Ya pagué: registrar mi inscripción" : "Registrar mi pedido"}</button>
+          <div id="registro" style="margin-top:14px"></div>`;
+
+        document.getElementById("registrar").onclick = async (ev) => {
+          ev.target.disabled = true;
+          const { data, error } = await supabase.rpc("submit_request", {
+            p_type: "inscripcion", p_email: email, p_name: nombre, p_detail: detalle + (curso.checkoutUrl ? "\nDice que ya pagó." : ""),
+          });
+          if (error) { ev.target.disabled = false; return showMsg(msg, "err", error.message); }
+          document.getElementById("registro").innerHTML = `
+            <div class="msg msg-ok">Listo. Tu número de pedido es <b>${esc(data)}</b>. Te avisamos a ${esc(email)} cuando tu acceso esté habilitado, dentro de las ${CONFIG.HORAS_RESPUESTA} horas.</div>
+            ${CONFIG.WHATSAPP ? `<a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="${linkMensaje("Mandé mi inscripción " + data, "Email: " + email + "\n" + detalle)}">Mandar el comprobante por WhatsApp</a>` : ""}
+            <p class="small muted" style="margin-top:12px">Mientras tanto podés leer la <a href="aula.html">clase gratis</a>.</p>`;
+          pasos[2].classList.add("hecho");
+        };
+        pasos[1].scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
   </script>
 </body>
 </html>

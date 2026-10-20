@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ingresar | Duvna Academy</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/img/icono-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/duvna.css">
+  <script type="module" src="assets/js/app.js"></script>
+</head>
+<body>
+  <header id="site-header" class="site-header"></header>
+
+  <main class="form-page">
+    <div class="wrap">
+      <div class="form-intro">
+        <h1>Tu cuenta en Duvna</h1>
+        <p>Con tu cuenta ves la clase gratis, y cuando te inscribís, el curso completo.</p>
+      </div>
+
+      <div class="form-card">
+        <div class="tabs" role="tablist">
+          <button role="tab" id="tab-login" aria-selected="true" aria-controls="form-login" type="button">Ingresar</button>
+          <button role="tab" id="tab-signup" aria-selected="false" aria-controls="form-signup" type="button">Crear cuenta</button>
+        </div>
+
+        <div id="msg" class="msg" role="status" aria-live="polite"></div>
+
+        <form id="form-login" role="tabpanel" aria-labelledby="tab-login" novalidate>
+          <div class="field">
+            <label for="li-email">Email</label>
+            <input id="li-email" type="email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label for="li-pass">Contraseña</label>
+            <input id="li-pass" type="password" autocomplete="current-password" required>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Ingresar</button>
+          <p class="small" style="margin:16px 0 0"><a href="#" id="forgot">Olvidé mi contraseña</a></p>
+        </form>
+
+        <form id="form-signup" role="tabpanel" aria-labelledby="tab-signup" hidden novalidate>
+          <div class="field">
+            <label for="su-name">Nombre y apellido</label>
+            <input id="su-name" type="text" autocomplete="name" required maxlength="80">
+            <p class="hint">Así va a figurar en tu certificado.</p>
+          </div>
+          <div class="field">
+            <label for="su-email">Email</label>
+            <input id="su-email" type="email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label for="su-pass">Contraseña</label>
+            <input id="su-pass" type="password" autocomplete="new-password" required minlength="8">
+            <p class="hint">Mínimo 8 caracteres.</p>
+          </div>
+          <label class="check">
+            <input id="su-terms" type="checkbox" required>
+            <span>Leí y acepto los <a href="legal/terminos.html" target="_blank">términos y condiciones</a> y la <a href="legal/privacidad.html" target="_blank">política de privacidad</a>. Si soy menor de 18 años, cuento con la autorización de mi madre, padre o tutor.</span>
+          </label>
+          <button class="btn btn-primary btn-block" type="submit">Crear cuenta</button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <script type="module">
+    import { CONFIG, supabase, requireBackend, showMsg, authError, getSession, linkMensaje } from "./assets/js/app.js";
+
+    const params = new URLSearchParams(location.search);
+    // Solo se vuelve a páginas de este mismo sitio.
+    const rawNext = params.get("next") || "aula.html";
+    const next = /^([a-z][a-z0-9+.-]*:|\/\/|\\)/i.test(rawNext) ? "aula.html" : rawNext;
+    const msg = document.getElementById("msg");
+    const tabs = { login: document.getElementById("tab-login"), signup: document.getElementById("tab-signup") };
+    const forms = { login: document.getElementById("form-login"), signup: document.getElementById("form-signup") };
+
+    function elegir(cual) {
+      for (const k of ["login", "signup"]) {
+        tabs[k].setAttribute("aria-selected", String(k === cual));
+        forms[k].hidden = k !== cual;
+      }
+      msg.className = "msg"; msg.textContent = "";
+    }
+    tabs.login.onclick = () => elegir("login");
+    tabs.signup.onclick = () => elegir("signup");
+    if (params.get("registro")) elegir("signup");
+    const pre = params.get("email");
+    if (pre) { document.getElementById("li-email").value = pre; document.getElementById("su-email").value = pre; }
+    const preNombre = params.get("nombre");
+    if (preNombre) document.getElementById("su-name").value = preNombre;
+
+    const listo = requireBackend(msg);
+    if (listo && await getSession()) location.replace(next);
+
+    const ocupado = (form, si) => form.querySelectorAll("button, input").forEach(el => (el.disabled = si));
+
+    forms.login.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!listo) return;
+      const email = document.getElementById("li-email").value.trim();
+      const password = document.getElementById("li-pass").value;
+      if (!email || !password) return showMsg(msg, "err", "Completá tu email y tu contraseña.");
+      ocupado(forms.login, true);
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      ocupado(forms.login, false);
+      if (error) return showMsg(msg, "err", authError(error));
+      location.href = next;
+    });
+
+    forms.signup.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!listo) return;
+      const full_name = document.getElementById("su-name").value.trim();
+      const email = document.getElementById("su-email").value.trim();
+      const password = document.getElementById("su-pass").value;
+      if (full_name.length < 3) return showMsg(msg, "err", "Escribí tu nombre y apellido.");
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showMsg(msg, "err", "Revisá tu email: tiene que tener la forma nombre@ejemplo.com.");
+      if (password.length < 8) return showMsg(msg, "err", "La contraseña tiene que tener al menos 8 caracteres.");
+      if (!document.getElementById("su-terms").checked) return showMsg(msg, "err", "Para crear la cuenta tenés que aceptar los términos y la política de privacidad.");
+      ocupado(forms.signup, true);
+      const { data, error } = await supabase.auth.signUp({
+        email, password,
+        options: { data: { full_name }, emailRedirectTo: new URL(next, location.href).href },
+      });
+      ocupado(forms.signup, false);
+      if (error) return showMsg(msg, "err", authError(error));
+      if (data.session) return (location.href = next);
+      showMsg(msg, "ok", "Te enviamos un email para confirmar tu cuenta. Abrí el enlace y después ingresá.");
+    });
+
+    document.getElementById("forgot").addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (!listo) return;
+      const email = document.getElementById("li-email").value.trim();
+      if (!email) return showMsg(msg, "info", "Escribí tu email arriba y volvé a tocar \"Olvidé mi contraseña\".");
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: new URL("cuenta.html", location.href).href });
+      if (error) {
+        msg.className = "msg msg-info";
+        msg.innerHTML = `No pudimos enviarte el email. <a href="${linkMensaje("Olvidé mi contraseña", `Email de mi cuenta: ${email}`)}" target="_blank" rel="noopener">Escribinos</a> y te ayudamos a recuperar tu cuenta.`;
+        return;
+      }
+      showMsg(msg, "ok", "Si hay una cuenta con ese email, te llega un enlace para crear una contraseña nueva.");
+    });
+  </script>
+</body>
+</html>

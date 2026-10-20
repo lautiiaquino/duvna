@@ -11,8 +11,10 @@ Sitio de cursos online de Duvna Academy: landings, cuentas de alumnos, clases pr
 ```
 index.html              Inicio de la academia
 inscripcion.html        Inscripción en 3 pasos
-aula.html               Aula: clase de muestra gratis y curso completo con código
-acceso.html             Ingreso con código de acceso
+ingresar.html           Ingreso y registro
+cuenta.html             Contraseña nueva
+aula.html               Aula: clase de muestra gratis y curso completo
+admin.html              Panel de administrador
 certificado.html        Certificado del alumno
 verificar.html          Verificación pública de certificados
 assets/curso/           Índice, clase de muestra y curso cifrado
@@ -25,16 +27,25 @@ assets/css/duvna.css    Estilos
 supabase/               Base de datos para cuando se sumen las cuentas
 ```
 
-## Cómo funciona la venta (sin base de datos)
+## Cómo funciona (con Supabase)
 
-1. **Inscripción** (`inscripcion.html`): el alumno pone nombre y email, acepta términos y paga con el link de Mercado Pago de `config.js` (`checkoutUrl`). Si el link está vacío, el pedido llega por WhatsApp o email.
-2. **Acceso** (`acceso.html`): vos le mandás el código de acceso por email. Con ese código se desbloquean las 41 clases en `aula.html`.
-3. **Certificado** (`certificado.html`): al marcar todas las clases, el alumno ve su certificado con código. Si pide registrarlo, se agrega a `assets/curso/certificados.json` y queda verificable en `verificar.html`.
+1. **Cuenta**: el alumno crea su cuenta en `ingresar.html`.
+2. **Inscripción** (`inscripcion.html`): acepta los términos, paga con Mercado Pago y registra su pedido. El pedido aparece en el panel.
+3. **Acceso**: desde `admin.html` → Pedidos, tocás "Pago confirmado: dar 30 días". El alumno ya ve las 41 clases en `aula.html`.
+4. **Progreso y certificado**: se guardan en la base. Al terminar, el alumno obtiene su certificado con código único, verificable en `verificar.html`.
+5. **Bajas y arrepentimientos**: llegan al panel con su código de constancia. Desde ahí cortás el acceso al final del período o en el momento.
 
-- El curso viaja **cifrado** (AES-256) en `assets/curso/curso.enc.json`: sin el código no se puede leer.
-- Los registros de certificados también están cifrados: sin el código de cada certificado no se ven nombres.
-- **Rotá el código de acceso una vez por mes** y mandáselo solo a quienes siguen pagando: así, quien se da de baja deja de tener acceso.
-- Los pedidos de baja y arrepentimiento llegan por WhatsApp o email con un código de constancia. Respondelos dentro de las 24 horas.
+La seguridad la da `supabase/schema.sql`: el servidor solo entrega una clase si es de muestra o si el alumno tiene acceso vigente, y solo el administrador puede dar acceso.
+
+## Puesta en marcha de Supabase
+
+1. Creá el proyecto y pegá `supabase/schema.sql` completo en **SQL Editor → Run**.
+2. **Authentication → Sign In / Providers → Email**: desactivá **Confirm email** mientras no tengas un servicio de email propio (el de Supabase solo envía a los miembros del equipo).
+3. **Authentication → URL Configuration**: Site URL `https://lautiiaquino.github.io/duvna/` y en Redirect URLs `https://lautiiaquino.github.io/duvna/**`.
+4. Copiá **Project URL** y **anon public key** en `assets/js/config.js`. Nunca pongas la `service_role` key en el sitio.
+5. Creá tu cuenta en la web y hacete administrador en el SQL Editor:
+   `update profiles set is_admin = true where email = 'tu@email.com';`
+6. Entrá a **Panel → Curso** y cargá las clases con el código del archivo del curso.
 
 ## Datos para completar en `assets/js/config.js`
 

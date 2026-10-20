@@ -1,108 +1,64 @@
-// Aula de Duvna Academy (versión preview, sin base de datos).
-// El curso viaja cifrado en assets/curso/curso.enc.json y solo se abre con el código de acceso.
-import { BASE } from "./app.js";
+// Aula de Duvna Academy conectada a Supabase.
+// Las clases viven en la base de datos: el servidor solo entrega una clase
+// si es de muestra o si el alumno tiene acceso vigente.
+import { supabase, getSession, getPerfil } from "./app.js";
 
-const CLAVE_ACCESO = "duvna_acceso";
-const CLAVE_PROGRESO = "duvna_progreso";
+export async function estadoAlumno(curso) {
+  const session = await getSession();
+  const [{ data: outline, error }, perfil] = await Promise.all([
+    supabase.rpc("course_outline", { p_course: curso }),
+    getPerfil(),
+  ]);
+  if (error) throw error;
 
-// ---------- Almacenamiento local (puede no estar disponible) ----------
-function leer(clave, porDefecto) {
-  try {
-    const v = localStorage.getItem(clave);
-    return v ? JSON.parse(v) : porDefecto;
-  } catch {
-    return porDefecto;
+  let inscripcion = null, hechas = new Set(), certificado = null;
+  if (session) {
+    const [ins, prog, cert] = await Promise.all([
+      supabase.from("enrollments").select("status, current_period_end").eq("course_id", curso).eq("user_id", session.user.id).maybeSingle(),
+      supabase.from("progress").select("lesson_id").eq("user_id", session.user.id),
+      supabase.from("certificates").select("code").eq("course_id", curso).eq("user_id", session.user.id).maybeSingle(),
+    ]);
+    inscripcion = ins.data;
+    hechas = new Set((prog.data || []).map(p => p.lesson_id));
+    certificado = cert.data?.code || null;
   }
-}
-function escribir(clave, valor) {
-  try { localStorage.setItem(clave, JSON.stringify(valor)); } catch { /* sin almacenamiento: sigue funcionando en esta pestaña */ }
-}
-
-export function accesoGuardado() { return leer(CLAVE_ACCESO, null); }
-export function guardarAcceso(codigo, nombre) { escribir(CLAVE_ACCESO, { codigo, nombre }); }
-export function cerrarSesion() { try { localStorage.removeItem(CLAVE_ACCESO); } catch {} }
-
-export function progreso() { return new Set(leer(CLAVE_PROGRESO, [])); }
-export function marcar(id, hecho) {
-  const p = progreso();
-  hecho ? p.add(id) : p.delete(id);
-  escribir(CLAVE_PROGRESO, [...p]);
-  return p;
+  const vigente = !!inscripcion && new Date(inscripcion.current_period_end) > new Date();
+  return { session, perfil, outline: outline || [], inscripcion, acceso: vigente || !!perfil?.is_admin, hechas, certificado };
 }
 
-// ---------- Datos del curso ----------
-export async function cargarIndice() {
-  const r = await fetch(`${BASE}assets/curso/indice.json`);
-  return r.json();
-}
-export async function cargarMuestra() {
-  const r = await fetch(`${BASE}assets/curso/muestra.json`);
-  return r.json();
+// Devuelve la clase, o null si el servidor no la entrega (sin acceso).
+export async function cargarClase(id) {
+  const { data } = await supabase.from("lessons")
+    .select("id, title, module_no, module_title, position, body_html, is_preview").eq("id", id).maybeSingle();
+  return data;
 }
 
-const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-export const normalizar = (codigo) => String(codigo || "").trim().toUpperCase();
-
-let cache = null;
-// Devuelve { id: html } con todas las clases, o lanza un error si el código no es válido.
-export async function abrirCurso(codigo) {
-  if (cache && cache.codigo === normalizar(codigo)) return cache.clases;
-  const r = await fetch(`${BASE}assets/curso/curso.enc.json`);
-  const enc = await r.json();
-  const material = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(normalizar(codigo)), "PBKDF2", false, ["deriveKey"]);
-  const clave = await crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: b64(enc.sal), iterations: enc.iter, hash: "SHA-256" },
-    material, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
-  let plano;
-  try {
-    plano = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(enc.iv) }, clave, b64(enc.datos));
-  } catch {
-    throw new Error("codigo");
+export async function marcar(userId, lessonId, hecho) {
+  if (hecho) {
+    const { error } = await supabase.from("progress").insert({ user_id: userId, lesson_id: lessonId });
+    return !error || error.code === "23505"; // 23505 = ya estaba marcada
   }
-  const clases = JSON.parse(new TextDecoder().decode(plano));
-  cache = { codigo: normalizar(codigo), clases };
-  return clases;
+  const { error } = await supabase.from("progress").delete().eq("user_id", userId).eq("lesson_id", lessonId);
+  return !error;
 }
 
-// ---------- Certificados ----------
-// Código del certificado: se calcula a partir del nombre, el curso y la fecha,
-// así siempre sale el mismo para el mismo alumno.
-export async function codigoCertificado(nombre, curso, fecha) {
-  const datos = new TextEncoder().encode(`${nombre.trim().toLowerCase()}|${curso}|${fecha}`);
-  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", datos));
-  const hex = [...hash.slice(0, 4)].map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
-  return `DUV-${hex.slice(0, 4)}-${hex.slice(4, 8)}`;
+export async function pedirCertificado(curso) {
+  const { data, error } = await supabase.rpc("issue_certificate", { p_course: curso });
+  if (error) throw new Error(error.message);
+  return data;
 }
 
-// Certificados registrados. El archivo público no muestra nombres: cada registro
-// está cifrado con su propio código, así que solo se puede leer teniendo el código.
-async function sha256(texto) {
-  return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto)));
+export async function verificarCertificado(codigo) {
+  const { data, error } = await supabase.rpc("verify_certificate", { p_code: String(codigo || "").trim().toUpperCase() });
+  if (error) throw error;
+  return data?.[0] || null;
 }
-const hex = (bytes) => [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
 
-export async function buscarCertificado(codigo) {
-  codigo = normalizar(codigo);
-  let lista = [];
+export function ultimaClase(id) {
   try {
-    const r = await fetch(`${BASE}assets/curso/certificados.json`, { cache: "no-store" });
-    lista = await r.json();
-  } catch {
-    return null;
-  }
-  const id = hex(await sha256(`duvna-id|${codigo}`));
-  const entrada = lista.find(e => e.id === id);
-  if (!entrada) return null;
-  const clave = await crypto.subtle.importKey("raw", await sha256(`duvna-cert|${codigo}`), "AES-GCM", false, ["decrypt"]);
-  try {
-    const plano = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(entrada.iv) }, clave, b64(entrada.datos));
-    return JSON.parse(new TextDecoder().decode(plano));
+    if (id) localStorage.setItem("duvna_ultima", id);
+    return localStorage.getItem("duvna_ultima");
   } catch {
     return null;
   }
 }
-
-const CLAVE_FIN = "duvna_fin";
-export function fechaFinalizacion() { return leer(CLAVE_FIN, null); }
-export function guardarFinalizacion(fecha) { escribir(CLAVE_FIN, fecha); }

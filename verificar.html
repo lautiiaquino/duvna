@@ -36,8 +36,8 @@
   </main>
   <footer id="site-footer" class="site-footer"></footer>
   <script type="module">
-    import { esc, showMsg } from "./assets/js/app.js";
-    import { buscarCertificado } from "./assets/js/aula.js";
+    import { esc, showMsg, requireBackend } from "./assets/js/app.js";
+    import { verificarCertificado } from "./assets/js/aula.js";
 
     const msg = document.getElementById("msg");
     const input = document.getElementById("code");
@@ -46,15 +46,17 @@
     async function verificar(codigo) {
       result.innerHTML = "";
       codigo = codigo.trim().toUpperCase();
-      if (!/^DUV-[0-9A-F]{4}-[0-9A-F]{4}$/.test(codigo)) return showMsg(msg, "err", "El código tiene la forma DUV-XXXX-XXXX. Revisá que esté completo.");
-      const c = await buscarCertificado(codigo);
-      if (!c) return showMsg(msg, "err", `No hay ningún certificado registrado con el código ${codigo}.`);
+      if (!requireBackend(msg)) return;
+      if (!/^DUV-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(codigo)) return showMsg(msg, "err", "El código tiene la forma DUV-XXXX-XXXX. Revisá que esté completo.");
+      let c = null;
+      try { c = await verificarCertificado(codigo); } catch { return showMsg(msg, "err", "No pudimos consultar el certificado. Probá de nuevo en unos minutos."); }
+      if (!c) return showMsg(msg, "err", `No existe ningún certificado con el código ${codigo}.`);
       showMsg(msg, "ok", "Certificado válido.");
-      const fecha = new Date(c.fecha + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
+      const fecha = new Date(c.issued_at).toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
       result.innerHTML = `<dl class="kv" style="margin-top:16px">
-        <dt>Alumno</dt><dd>${esc(c.nombre)}</dd>
-        <dt>Curso</dt><dd>${esc(c.curso)}</dd>
-        <dt>Finalizado</dt><dd>${fecha}</dd>
+        <dt>Alumno</dt><dd>${esc(c.full_name)}</dd>
+        <dt>Curso</dt><dd>${esc(c.course_title)}</dd>
+        <dt>Emitido</dt><dd>${fecha}</dd>
         <dt>Código</dt><dd style="font-family:var(--mono)">${esc(codigo)}</dd></dl>
         <p class="small muted" style="margin-top:14px">Certificado privado de finalización emitido por Duvna Academy. No es un título oficial.</p>`;
       history.replaceState(null, "", `?codigo=${codigo}`);

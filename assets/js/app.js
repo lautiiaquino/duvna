@@ -15,7 +15,7 @@ let client = null;
 let loadFailed = false;
 if (configured) {
   try {
-    const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
+    const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm");
     client = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
   } catch {
     loadFailed = true;
@@ -29,7 +29,7 @@ export function requireBackend(msgEl) {
     msgEl.className = "msg msg-info";
     msgEl.textContent = loadFailed
       ? "No pudimos conectar con el sistema de cuentas. Revisá tu conexión y recargá la página."
-      : "El sistema de cuentas todavía no está conectado. Completá SUPABASE_URL y SUPABASE_ANON_KEY en assets/js/config.js.";
+      : "El sistema de cuentas se está habilitando. Probá de nuevo en unos minutos o escribinos.";
   }
   return false;
 }
@@ -38,6 +38,15 @@ export async function getSession() {
   if (!supabase) return null;
   const { data } = await supabase.auth.getSession();
   return data.session;
+}
+
+let perfilCache;
+export async function getPerfil() {
+  if (perfilCache !== undefined) return perfilCache;
+  const session = await getSession();
+  if (!session) return (perfilCache = null);
+  const { data } = await supabase.from("profiles").select("full_name, email, is_admin").eq("id", session.user.id).maybeSingle();
+  return (perfilCache = data ? { ...data, id: session.user.id } : null);
 }
 
 // Redirige al ingreso si no hay sesión; vuelve a la página actual después.
@@ -90,15 +99,12 @@ export function authError(err) {
 }
 
 // ---------- Encabezado y pie comunes ----------
-function tieneAcceso() {
-  try { return !!JSON.parse(localStorage.getItem("duvna_acceso") || "null")?.codigo; } catch { return false; }
-}
-
 async function renderHeader() {
   const el = document.getElementById("site-header");
   if (!el) return;
   el.className = "site-header";
-  el.innerHTML = `
+  const pintar = (perfil) => {
+    el.innerHTML = `
     <div class="wrap">
       <a class="brand" href="${BASE}" aria-label="Duvna Academy, inicio">
         <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
@@ -106,13 +112,16 @@ async function renderHeader() {
       </a>
       <nav class="nav" aria-label="Principal">
         <a class="hide-sm" href="${BASE}cursos/roblox-luau.html">Curso de Roblox</a>
-        <a class="hide-sm" href="${BASE}aula.html">Clase gratis</a>
-        ${tieneAcceso()
+        ${perfil?.is_admin ? `<a class="hide-sm" href="${BASE}admin.html">Admin</a>` : `<a class="hide-sm" href="${BASE}aula.html">Clase gratis</a>`}
+        ${perfil
           ? `<a class="btn btn-primary btn-sm" href="${BASE}aula.html">Mi curso</a>`
-          : `<a href="${BASE}acceso.html">Ingresar</a>
-             <a class="btn btn-primary btn-sm hide-xs" data-buy="roblox-luau" href="${BASE}cursos/roblox-luau.html#precio">Inscribirme</a>`}
+          : `<a href="${BASE}ingresar.html">Ingresar</a>
+             <a class="btn btn-primary btn-sm hide-xs" data-buy="roblox-luau" href="${BASE}inscripcion.html?curso=roblox-luau">Inscribirme</a>`}
       </nav>
     </div>`;
+  };
+  pintar(null);
+  if (supabase) pintar(await getPerfil());
 }
 
 function renderFooter() {
@@ -139,7 +148,7 @@ function renderFooter() {
             <li><a href="${BASE}cursos/roblox-luau.html">Curso de Roblox con Luau</a></li>
             <li><a href="${BASE}cursos/roblox-luau.html#programa">Programa del curso</a></li>
             <li><a href="${BASE}aula.html">Clase gratis</a></li>
-            <li><a href="${BASE}acceso.html">Ingresar al curso</a></li>
+            <li><a href="${BASE}ingresar.html">Ingresar al curso</a></li>
             <li><a href="${BASE}verificar.html">Verificar un certificado</a></li>
           </ul>
         </div>

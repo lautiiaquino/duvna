@@ -34,10 +34,12 @@
         <button class="btn btn-dark" type="submit">Enviar pedido de baja</button>
       </form>
       <script type="module">
-        import { CONFIG, esc, showMsg, linkWhatsApp, linkEmail } from "../assets/js/app.js";
+        import { CONFIG, supabase, esc, showMsg, linkWhatsApp, linkEmail, getSession } from "../assets/js/app.js";
         const msg = document.getElementById("msg");
         const form = document.getElementById("req-form");
         const salida = document.createElement("div");
+        const session = supabase ? await getSession() : null;
+        if (session) document.getElementById("r-email").value = session.user.email;
         form.appendChild(salida);
 
         // Código de constancia: lo ves en el momento y viaja dentro del pedido.
@@ -48,7 +50,7 @@
           return `BAJ-${t.slice(0, 4)}-${t.slice(4)}`;
         }
 
-        form.addEventListener("submit", (e) => {
+        form.addEventListener("submit", async (e) => {
           e.preventDefault();
           const name = document.getElementById("r-name").value.trim();
           const email = document.getElementById("r-email").value.trim();
@@ -56,18 +58,32 @@
           if (!name || !email) return showMsg(msg, "err", "Completá tu nombre y tu email.");
           if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showMsg(msg, "err", "Revisá tu email: tiene que tener la forma nombre@ejemplo.com.");
 
-          const codigo = constancia();
+          const boton = form.querySelector('button[type="submit"]');
+          boton.disabled = true;
+          // Con la base conectada, el pedido queda registrado y el código lo da el servidor.
+          let codigo = null;
+          if (supabase) {
+            const { data, error } = await supabase.rpc("submit_request", { p_type: "baja", p_email: email, p_name: name, p_detail: detail });
+            if (error) { boton.disabled = false; return showMsg(msg, "err", error.message); }
+            codigo = data;
+          }
+          const registrado = !!codigo;
+          codigo = codigo || constancia();
           const fecha = new Date().toLocaleString("es-AR");
           const cuerpo = `Pedido: Baja de suscripción\nCódigo de constancia: ${codigo}\nFecha: ${fecha}\nNombre: ${name}\nEmail: ${email}\n\n${detail}`;
           const wa = linkWhatsApp(cuerpo);
           const em = linkEmail(`Baja de suscripción ${codigo}`, cuerpo);
 
-          showMsg(msg, "ok", `Tu código de constancia es ${codigo}. Guardalo. Ahora enviá el pedido con uno de los botones: te confirmamos dentro de las ${CONFIG.HORAS_RESPUESTA} horas. No se te va a volver a cobrar y conservás el acceso hasta el final del período que ya pagaste.`);
-          salida.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px">
-            ${wa ? `<a class="btn btn-primary" href="${wa}" target="_blank" rel="noopener">Enviar por WhatsApp</a>` : ""}
-            <a class="btn ${wa ? "btn-ghost" : "btn-primary"}" href="${em}">Enviar por email</a></div>
-            <p class="small muted" style="margin-top:12px">Si no se abre ninguna app, escribí a <b>${esc(CONFIG.EMAIL_CONTACTO)}</b> con el asunto "Baja de suscripción ${codigo}".</p>`;
-          form.querySelector('button[type="submit"]').disabled = true;
+          if (registrado) {
+            showMsg(msg, "ok", `Recibimos tu pedido. Tu código de constancia es ${codigo}. Te confirmamos por email dentro de las ${CONFIG.HORAS_RESPUESTA} horas. No se te va a volver a cobrar y conservás el acceso hasta el final del período que ya pagaste.`);
+            salida.innerHTML = wa ? `<a class="btn btn-ghost btn-sm" href="${wa}" target="_blank" rel="noopener">Avisar también por WhatsApp</a>` : "";
+          } else {
+            showMsg(msg, "ok", `Tu código de constancia es ${codigo}. Guardalo. Ahora enviá el pedido con uno de los botones: te confirmamos dentro de las ${CONFIG.HORAS_RESPUESTA} horas. No se te va a volver a cobrar y conservás el acceso hasta el final del período que ya pagaste.`);
+            salida.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px">
+              ${wa ? `<a class="btn btn-primary" href="${wa}" target="_blank" rel="noopener">Enviar por WhatsApp</a>` : ""}
+              <a class="btn ${wa ? "btn-ghost" : "btn-primary"}" href="${em}">Enviar por email</a></div>
+              <p class="small muted" style="margin-top:12px">Si no se abre ninguna app, escribí a <b>${esc(CONFIG.EMAIL_CONTACTO)}</b> con el asunto "Baja de suscripción ${codigo}".</p>`;
+          }
         });
       </script>
     </div>

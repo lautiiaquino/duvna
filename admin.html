@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel | Duvna Academy</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/duvna.css">
+  <script type="module" src="assets/js/app.js"></script>
+</head>
+<body data-sin-chat>
+  <header id="site-header" class="site-header"></header>
+
+  <main class="section" style="padding-top:36px">
+    <div class="wrap">
+      <div class="panel-head">
+        <div>
+          <h1>Panel</h1>
+          <p class="muted" style="margin:0" id="resumen">Cargando…</p>
+        </div>
+      </div>
+      <div id="msg" class="msg" role="status" aria-live="polite"></div>
+
+      <div class="tabs admin-tabs" role="tablist" id="tabs" hidden>
+        <button role="tab" type="button" data-tab="pedidos" aria-selected="true">Pedidos <span class="cuenta" id="n-pedidos"></span></button>
+        <button role="tab" type="button" data-tab="alumnos" aria-selected="false">Alumnos</button>
+        <button role="tab" type="button" data-tab="certificados" aria-selected="false">Certificados</button>
+        <button role="tab" type="button" data-tab="curso" aria-selected="false">Curso</button>
+      </div>
+
+      <section data-panel="pedidos" hidden>
+        <div class="admin-bar">
+          <label class="check" style="margin:0"><input type="checkbox" id="ver-todos"> <span>Mostrar también los procesados</span></label>
+        </div>
+        <div id="lista-pedidos"></div>
+      </section>
+
+      <section data-panel="alumnos" hidden>
+        <form class="box admin-grant" id="form-acceso" novalidate>
+          <h2 style="margin-bottom:12px">Dar acceso</h2>
+          <div class="admin-grant-fila">
+            <div class="field" style="margin:0;flex:2 1 220px">
+              <label for="g-email">Email de la cuenta del alumno</label>
+              <input id="g-email" type="email" autocomplete="off" required>
+            </div>
+            <div class="field" style="margin:0;flex:1 1 120px">
+              <label for="g-dias">Días</label>
+              <select id="g-dias"><option value="30">30 (1 mes)</option><option value="90">90</option><option value="365">365</option></select>
+            </div>
+            <button class="btn btn-primary" type="submit" style="align-self:flex-end">Dar acceso</button>
+          </div>
+          <p class="hint">Si ya tiene acceso vigente, se suma a partir del vencimiento.</p>
+        </form>
+        <div class="field" style="max-width:360px">
+          <label for="buscar">Buscar alumno</label>
+          <input id="buscar" type="search" placeholder="Nombre o email">
+        </div>
+        <div id="lista-alumnos"></div>
+      </section>
+
+      <section data-panel="certificados" hidden>
+        <div id="lista-certificados"></div>
+      </section>
+
+      <section data-panel="curso" hidden>
+        <div class="box">
+          <h2>Clases cargadas</h2>
+          <p id="estado-curso" class="muted">Cargando…</p>
+        </div>
+        <form class="box" id="form-importar" novalidate>
+          <h2>Cargar o actualizar el curso</h2>
+          <p class="muted">Sube las 41 clases a la base de datos desde el archivo cifrado del sitio. Usá el código de acceso de la versión anterior (el que empieza con DUVNA-).</p>
+          <div class="field" style="max-width:320px">
+            <label for="imp-codigo">Código del archivo del curso</label>
+            <input id="imp-codigo" type="text" autocomplete="off" spellcheck="false" placeholder="DUVNA-XXXX-XXXX" style="font-family:var(--mono);text-transform:uppercase">
+          </div>
+          <button class="btn btn-primary" type="submit" id="imp-boton">Cargar las clases</button>
+          <div class="progress" style="margin-top:18px" hidden id="imp-barra-caja"><span id="imp-barra" style="width:0%"></span></div>
+          <p class="small muted" id="imp-estado"></p>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <script type="module">
+    import { BASE, supabase, requireBackend, getSession, getPerfil, esc, showMsg, fmtDate } from "./assets/js/app.js";
+
+    async function main() {
+      const CURSO = "roblox-luau";
+      const msg = document.getElementById("msg");
+      const resumen = document.getElementById("resumen");
+      const fecha = (iso) => new Date(iso).toLocaleString("es-AR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+      if (!requireBackend(msg)) return;
+      const session = await getSession();
+      if (!session) { location.href = "ingresar.html?next=admin.html"; return; }
+      const perfil = await getPerfil();
+      if (!perfil?.is_admin) {
+        resumen.textContent = "";
+        showMsg(msg, "err", "Esta página es solo para el administrador de Duvna Academy.");
+        return;
+      }
+      document.getElementById("tabs").hidden = false;
+
+      // ---------- Pestañas ----------
+      const tabs = [...document.querySelectorAll("[data-tab]")];
+      function abrir(nombre) {
+        tabs.forEach(t => t.setAttribute("aria-selected", String(t.dataset.tab === nombre)));
+        document.querySelectorAll("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== nombre));
+        try { sessionStorage.setItem("duvna_admin_tab", nombre); } catch {}
+      }
+      tabs.forEach(t => (t.onclick = () => abrir(t.dataset.tab)));
+      abrir((() => { try { return sessionStorage.getItem("duvna_admin_tab"); } catch { return null; } })() || "pedidos");
+
+      const aviso = (tipo, texto) => { showMsg(msg, tipo, texto); window.scrollTo({ top: 0, behavior: "smooth" }); };
+
+      // ---------- Acciones de acceso ----------
+      async function darAcceso(email, dias, nota) {
+        const { data, error } = await supabase.rpc("admin_grant_access", { p_email: email, p_course: CURSO, p_days: dias, p_note: nota || null });
+        if (error) { aviso("err", error.message); return false; }
+        aviso("ok", `Acceso habilitado para ${email} hasta el ${fmtDate(data)}. Avisale por email que ya puede entrar.`);
+        return true;
+      }
+      async function quitarAcceso(userId, ya) {
+        const { error } = await supabase.rpc("admin_revoke_access", { p_user: userId, p_course: CURSO, p_now: ya });
+        if (error) { aviso("err", error.message); return false; }
+        aviso("ok", ya ? "Acceso cortado. Si corresponde, hacé la devolución desde Mercado Pago." : "Baja registrada: conserva el acceso hasta el final del período pagado. Cancelá la suscripción en Mercado Pago.");
+        return true;
+      }
+      async function idPorEmail(email) {
+        const { data } = await supabase.from("profiles").select("id").eq("email", email.trim().toLowerCase()).maybeSingle();
+        return data?.id || null;
+      }
+
+      // ---------- Pedidos ----------
+      const TIPOS = { inscripcion: "Inscripción", baja: "Baja", arrepentimiento: "Arrepentimiento" };
+      async function cargarPedidos() {
+        const todos = document.getElementById("ver-todos").checked;
+        let q = supabase.from("requests").select("*").order("created_at", { ascending: false }).limit(200);
+        if (!todos) q = q.eq("status", "recibido");
+        const { data, error } = await q;
+        const caja = document.getElementById("lista-pedidos");
+        if (error) return (caja.innerHTML = `<p class="muted">No se pudieron cargar los pedidos.</p>`);
+        const pendientes = (data || []).filter(p => p.status === "recibido").length;
+        document.getElementById("n-pedidos").textContent = pendientes ? pendientes : "";
+        if (!data?.length) return (caja.innerHTML = `<div class="box"><p class="muted" style="margin:0">No hay pedidos ${todos ? "" : "pendientes"}. Cuando alguien se inscriba o pida una baja, aparece acá.</p></div>`);
+        caja.innerHTML = data.map(p => `
+          <article class="box admin-item ${p.status === "procesado" ? "listo" : ""}" data-id="${p.id}">
+            <div class="admin-item-head">
+              <span class="badge ${p.type === "inscripcion" ? "badge-ok" : "badge-off"}">${TIPOS[p.type]}</span>
+              <span class="mono small">${esc(p.code)}</span>
+              <span class="small muted">${fecha(p.created_at)}</span>
+              ${p.status === "procesado" ? '<span class="small muted">Procesado</span>' : ""}
+            </div>
+            <p style="margin:10px 0 4px"><b>${esc(p.full_name || "Sin nombre")}</b> · <a href="mailto:${esc(p.email)}">${esc(p.email)}</a></p>
+            ${p.detail ? `<p class="small muted" style="white-space:pre-line;margin:0">${esc(p.detail)}</p>` : ""}
+            ${p.status === "recibido" ? `<div class="admin-acciones">
+              ${p.type === "inscripcion" ? `<button class="btn btn-primary btn-sm" data-accion="dar" type="button">Pago confirmado: dar 30 días</button>` : ""}
+              ${p.type === "baja" ? `<button class="btn btn-ghost btn-sm" data-accion="baja" type="button">Dar de baja al final del período</button>` : ""}
+              ${p.type === "arrepentimiento" ? `<button class="btn btn-ghost btn-sm" data-accion="cortar" type="button">Cortar el acceso ya</button>` : ""}
+              <button class="btn btn-ghost btn-sm" data-accion="listo" type="button">Marcar como procesado</button>
+            </div>` : ""}
+          </article>`).join("");
+        caja.querySelectorAll("[data-accion]").forEach(b => (b.onclick = () => accionPedido(b, data.find(x => x.id === b.closest("[data-id]").dataset.id))));
+      }
+      async function accionPedido(boton, p) {
+        boton.disabled = true;
+        let ok = true;
+        if (boton.dataset.accion === "dar") ok = await darAcceso(p.email, 30, `Pedido ${p.code}`);
+        if (boton.dataset.accion === "baja" || boton.dataset.accion === "cortar") {
+          const uid = p.user_id || await idPorEmail(p.email);
+          if (!uid) { aviso("err", `No hay una cuenta con el email ${p.email}. Revisá si usó otro email.`); ok = false; }
+          else ok = await quitarAcceso(uid, boton.dataset.accion === "cortar");
+        }
+        if (ok) await supabase.from("requests").update({ status: "procesado" }).eq("id", p.id);
+        boton.disabled = false;
+        await Promise.all([cargarPedidos(), cargarAlumnos()]);
+      }
+      document.getElementById("ver-todos").onchange = cargarPedidos;
+
+      // ---------- Alumnos ----------
+      let alumnos = [];
+      async function cargarAlumnos() {
+        const [{ data: perfiles }, { data: inscripciones }] = await Promise.all([
+          supabase.from("profiles").select("id, full_name, email, is_admin, created_at").order("created_at", { ascending: false }),
+          supabase.from("enrollments").select("user_id, status, current_period_end").eq("course_id", CURSO),
+        ]);
+        const porUsuario = new Map((inscripciones || []).map(i => [i.user_id, i]));
+        alumnos = (perfiles || []).map(p => ({ ...p, ins: porUsuario.get(p.id) }));
+        const activos = alumnos.filter(a => a.ins && new Date(a.ins.current_period_end) > new Date()).length;
+        resumen.textContent = `${alumnos.length} ${alumnos.length === 1 ? "cuenta" : "cuentas"} · ${activos} con acceso vigente`;
+        pintarAlumnos();
+      }
+      function pintarAlumnos() {
+        const q = document.getElementById("buscar").value.trim().toLowerCase();
+        const lista = alumnos.filter(a => !q || a.full_name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q));
+        const caja = document.getElementById("lista-alumnos");
+        if (!lista.length) return (caja.innerHTML = `<p class="muted">${q ? "Nadie coincide con la búsqueda." : "Todavía no hay cuentas."}</p>`);
+        caja.innerHTML = lista.map(a => {
+          const vigente = a.ins && new Date(a.ins.current_period_end) > new Date();
+          const estado = a.is_admin ? '<span class="badge badge-ok">Admin</span>'
+            : vigente ? `<span class="badge badge-ok">${a.ins.status === "cancelled" ? "Baja, acceso" : "Activo"} hasta ${fmtDate(a.ins.current_period_end)}</span>`
+            : a.ins ? '<span class="badge badge-off">Vencido</span>' : '<span class="badge badge-off">Sin acceso</span>';
+          return `<article class="box admin-item" data-uid="${a.id}">
+            <div class="admin-item-head"><b>${esc(a.full_name || "Sin nombre")}</b>${estado}</div>
+            <p class="small muted" style="margin:6px 0 0">${esc(a.email)} · cuenta creada el ${fmtDate(a.created_at)}</p>
+            ${a.is_admin ? "" : `<div class="admin-acciones">
+              <button class="btn btn-primary btn-sm" data-dias="30" type="button">+30 días</button>
+              <button class="btn btn-ghost btn-sm" data-dias="365" type="button">+1 año</button>
+              ${vigente ? `<button class="btn btn-ghost btn-sm" data-quitar="fin" type="button">Baja al final del período</button>
+              <button class="btn btn-ghost btn-sm" data-quitar="ya" type="button">Cortar ya</button>` : ""}
+            </div>`}
+          </article>`;
+        }).join("");
+        caja.querySelectorAll("button").forEach(b => (b.onclick = async () => {
+          const a = alumnos.find(x => x.id === b.closest("[data-uid]").dataset.uid);
+          b.disabled = true;
+          if (b.dataset.dias) await darAcceso(a.email, Number(b.dataset.dias));
+          if (b.dataset.quitar) await quitarAcceso(a.id, b.dataset.quitar === "ya");
+          await cargarAlumnos();
+        }));
+      }
+      document.getElementById("buscar").oninput = pintarAlumnos;
+      document.getElementById("form-acceso").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("g-email").value.trim();
+        if (!email) return aviso("err", "Escribí el email de la cuenta del alumno.");
+        if (await darAcceso(email, Number(document.getElementById("g-dias").value))) {
+          document.getElementById("g-email").value = "";
+          await cargarAlumnos();
+        }
+      });
+
+      // ---------- Certificados ----------
+      async function cargarCertificados() {
+        const { data } = await supabase.from("certificates").select("code, full_name, issued_at").order("issued_at", { ascending: false });
+        const caja = document.getElementById("lista-certificados");
+        if (!data?.length) return (caja.innerHTML = `<div class="box"><p class="muted" style="margin:0">Todavía nadie terminó el curso. Los certificados aparecen acá cuando un alumno completa las clases.</p></div>`);
+        caja.innerHTML = data.map(c => `<article class="box admin-item">
+          <div class="admin-item-head"><b>${esc(c.full_name)}</b><span class="mono small">${esc(c.code)}</span><span class="small muted">${fmtDate(c.issued_at)}</span></div>
+          <div class="admin-acciones"><a class="btn btn-ghost btn-sm" href="certificado.html?codigo=${esc(c.code)}">Ver certificado</a></div>
+        </article>`).join("");
+      }
+
+      // ---------- Curso ----------
+      async function estadoCurso() {
+        const { data } = await supabase.rpc("course_outline", { p_course: CURSO });
+        const n = data?.length || 0;
+        document.getElementById("estado-curso").textContent = n
+          ? `${n} clases cargadas en ${new Set(data.map(l => l.module_no)).size} unidades.`
+          : "Todavía no hay clases cargadas. Usá el formulario de abajo.";
+      }
+
+      const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+      async function descifrar(codigo) {
+        const enc = await (await fetch(`${BASE}assets/curso/curso.enc.json`, { cache: "no-store" })).json();
+        const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(codigo.trim().toUpperCase()), "PBKDF2", false, ["deriveKey"]);
+        const clave = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64(enc.sal), iterations: enc.iter, hash: "SHA-256" },
+          material, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+        const plano = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(enc.iv) }, clave, b64(enc.datos));
+        return JSON.parse(new TextDecoder().decode(plano));
+      }
+
+      document.getElementById("form-importar").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const boton = document.getElementById("imp-boton");
+        const estado = document.getElementById("imp-estado");
+        const barra = document.getElementById("imp-barra");
+        boton.disabled = true;
+        estado.textContent = "Abriendo el archivo del curso…";
+        let clases, indice;
+        try {
+          [clases, indice] = await Promise.all([
+            descifrar(document.getElementById("imp-codigo").value),
+            fetch(`${BASE}assets/curso/indice.json`, { cache: "no-store" }).then(r => r.json()),
+          ]);
+        } catch {
+          boton.disabled = false;
+          estado.textContent = "";
+          return aviso("err", "No se pudo abrir el archivo del curso. Revisá el código o que el archivo siga en el sitio.");
+        }
+        const filas = indice.unidades.flatMap(u => u.clases.map(c => ({ u, c })));
+        document.getElementById("imp-barra-caja").hidden = false;
+        let hechas = 0;
+        for (const { u, c } of filas) {
+          const [, pos] = c.id.split("-").map(Number);
+          const { error } = await supabase.rpc("admin_upsert_lesson", {
+            p_course: CURSO, p_module: u.num, p_module_title: u.titulo, p_position: pos,
+            p_title: c.titulo, p_body: clases[c.id] || "", p_preview: c.id === indice.muestra,
+          });
+          if (error) {
+            boton.disabled = false;
+            return aviso("err", `Falló la clase ${c.id.replace("-", ".")}: ${error.message}`);
+          }
+          hechas++;
+          barra.style.width = `${Math.round((hechas / filas.length) * 100)}%`;
+          estado.textContent = `Cargando… ${hechas} de ${filas.length}`;
+        }
+        await estadoCurso();
+        estado.textContent = `Listo: ${hechas} clases cargadas.`;
+        boton.disabled = false;
+        aviso("ok", `El curso quedó cargado en la base de datos (${hechas} clases).`);
+      });
+
+      await Promise.all([cargarPedidos(), cargarAlumnos(), cargarCertificados(), estadoCurso()]);
+    }
+    main();
+  </script>
+</body>
+</html>

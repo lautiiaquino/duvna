@@ -60,52 +60,44 @@
   <footer id="site-footer" class="site-footer"></footer>
 
   <script type="module">
-    import { CONFIG, esc, linkMensaje } from "./assets/js/app.js";
-    import { accesoGuardado, cargarIndice, progreso, codigoCertificado, buscarCertificado, fechaFinalizacion, guardarFinalizacion } from "./assets/js/aula.js";
+    import { CONFIG, esc, requireBackend, showMsg } from "./assets/js/app.js";
+    import { verificarCertificado } from "./assets/js/aula.js";
 
     const out = document.getElementById("out");
-    const acceso = accesoGuardado();
-    const indice = await cargarIndice();
-    const todas = indice.unidades.flatMap(u => u.clases.map(c => c.id));
-    const hechas = progreso();
-    const faltan = todas.filter(id => !hechas.has(id)).length;
+    const msg = document.getElementById("msg");
+    const codigo = (new URLSearchParams(location.search).get("codigo") || "").toUpperCase();
 
-    if (!acceso?.codigo) {
-      out.innerHTML = `<div class="locked"><h1>Tu certificado</h1><p class="muted">Ingresá con tu código de acceso para ver tu certificado.</p><a class="btn btn-primary" href="acceso.html">Ingresar</a></div>`;
-    } else if (faltan > 0) {
-      out.innerHTML = `<div class="locked"><h1>Casi llegás</h1><p class="muted">Te ${faltan === 1 ? "falta 1 clase" : `faltan ${faltan} clases`} para obtener tu certificado. Marcá cada clase como completada cuando la termines.</p><a class="btn btn-primary" href="aula.html">Seguir con el curso</a></div>`;
-    } else {
-      let fecha = fechaFinalizacion();
-      if (!fecha) { fecha = new Date().toISOString().slice(0, 10); guardarFinalizacion(fecha); }
-      const curso = CONFIG.CURSOS["roblox-luau"].titulo;
-      const codigo = await codigoCertificado(acceso.nombre, "roblox-luau", fecha);
-      const fechaTexto = new Date(fecha + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
-      const verifyUrl = new URL(`verificar.html?codigo=${codigo}`, CONFIG.SITE_URL).href;
-      const registrado = !!(await buscarCertificado(codigo));
-
-      out.innerHTML = `
-        <section class="diploma" aria-label="Certificado de finalización">
-          <div class="org"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>duvna academy</div>
-          <div class="rule"></div>
-          <p class="lead">Certifica que</p>
-          <div class="name">${esc(acceso.nombre)}</div>
-          <p class="lead">completó las 41 clases del curso</p>
-          <p class="curso">${esc(curso)}</p>
-          <div class="foot">
-            <div class="sign">${esc(CONFIG.TITULAR)}<br><span>Fundador, Duvna Academy</span></div>
-            <div class="verify"><p>Emitido el ${fechaTexto}</p><p>Código ${codigo}</p><p>${esc(verifyUrl.replace(/^https?:\/\//, "").replace(/\?.*/, ""))}</p></div>
+    if (requireBackend(msg)) {
+      let c = null;
+      try { c = codigo ? await verificarCertificado(codigo) : null; } catch {}
+      if (!c) {
+        out.innerHTML = `<div class="locked"><h1>No encontramos ese certificado</h1><p class="muted">Revisá el código. Si terminaste el curso, obtené tu certificado desde el aula.</p><a class="btn btn-primary" href="aula.html">Ir al aula</a></div>`;
+      } else {
+        const fechaTexto = new Date(c.issued_at).toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
+        const verifyUrl = new URL(`verificar.html?codigo=${codigo}`, CONFIG.SITE_URL).href;
+        out.innerHTML = `
+          <section class="diploma" aria-label="Certificado de finalización">
+            <div class="org"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>duvna academy</div>
+            <div class="rule"></div>
+            <p class="lead">Certifica que</p>
+            <div class="name">${esc(c.full_name)}</div>
+            <p class="lead">completó todas las clases del curso</p>
+            <p class="curso">${esc(c.course_title)}</p>
+            <div class="foot">
+              <div class="sign">${esc(CONFIG.TITULAR)}<br><span>Fundador, Duvna Academy</span></div>
+              <div class="verify"><p>Emitido el ${fechaTexto}</p><p>Código ${esc(codigo)}</p><p>${esc(verifyUrl.replace(/^https?:\/\//, "").replace(/\?.*/, ""))}</p></div>
+            </div>
+          </section>
+          <div class="cert-acciones">
+            <button class="btn btn-primary" type="button" onclick="window.print()">Imprimir o guardar en PDF</button>
+            <button class="btn btn-ghost" type="button" id="copiar-link">Copiar link de verificación</button>
           </div>
-        </section>
-        <div class="cert-acciones">
-          <button class="btn btn-primary" type="button" onclick="window.print()">Imprimir o guardar en PDF</button>
-          ${registrado ? `<a class="btn btn-ghost" href="${esc(verifyUrl)}">Ver verificación</a>` : ""}
-        </div>
-        <div class="cert-estado">${registrado
-          ? `<p class="small muted">Tu certificado está registrado: cualquiera puede comprobarlo con el código <b>${codigo}</b>.</p>`
-          : `<p class="small muted">Para que tu certificado se pueda verificar públicamente, pedí su registro. Lo hacemos dentro de las ${CONFIG.HORAS_RESPUESTA} horas.</p>
-             <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="${linkMensaje("Registrar mi certificado", `Nombre: ${acceso.nombre}\nCurso: ${curso}\nFecha: ${fecha}\nCódigo: ${codigo}`)}">Registrar mi certificado</a>`}
-          <p class="small muted" style="margin-top:14px">Certificado privado de finalización. No es un título oficial. Revisá tu nombre: si está mal, volvé a ingresar con el nombre correcto.</p>
-        </div>`;
+          <div class="cert-estado"><p class="small muted">Cualquiera puede comprobar este certificado con el código <b>${esc(codigo)}</b>. Es un certificado privado de finalización, no un título oficial.</p></div>`;
+        document.getElementById("copiar-link").onclick = async (e) => {
+          try { await navigator.clipboard.writeText(verifyUrl); e.target.textContent = "Link copiado"; }
+          catch { showMsg(msg, "info", verifyUrl); }
+        };
+      }
     }
   </script>
 </body>

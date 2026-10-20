@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nueva contraseña | Duvna Academy</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/duvna.css">
+  <script type="module" src="assets/js/app.js"></script>
+</head>
+<body>
+  <header id="site-header" class="site-header"></header>
+  <main class="form-page">
+    <div class="wrap">
+      <div class="form-intro"><h1>Contraseña nueva</h1></div>
+      <form class="form-card" id="form" novalidate>
+        <div id="msg" class="msg" role="status" aria-live="polite"></div>
+        <div class="field">
+          <label for="pass">Contraseña nueva</label>
+          <input id="pass" type="password" autocomplete="new-password" minlength="8" required>
+          <p class="hint">Mínimo 8 caracteres.</p>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Guardar contraseña</button>
+      </form>
+    </div>
+  </main>
+  <footer id="site-footer" class="site-footer"></footer>
+  <script type="module">
+    import { supabase, requireBackend, showMsg, authError, getSession } from "./assets/js/app.js";
+    const msg = document.getElementById("msg");
+    const listo = requireBackend(msg);
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!listo) return;
+      if (!(await getSession())) return showMsg(msg, "err", "El enlace venció o ya se usó. Pedí uno nuevo desde Ingresar.");
+      const password = document.getElementById("pass").value;
+      if (password.length < 8) return showMsg(msg, "err", "La contraseña tiene que tener al menos 8 caracteres.");
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) return showMsg(msg, "err", authError(error));
+      showMsg(msg, "ok", "Contraseña guardada. Te llevamos a tu curso.");
+      setTimeout(() => (location.href = "aula.html"), 1200);
+    });
+  </script>
+</body>
+</html>
