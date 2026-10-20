@@ -10,8 +10,11 @@ Sitio de cursos online de Duvna Academy: landings, cuentas de alumnos, clases pr
 
 ```
 index.html              Inicio de la academia
+inscripcion.html        Inscripción en 3 pasos
 aula.html               Aula: clase de muestra gratis y curso completo con código
 acceso.html             Ingreso con código de acceso
+certificado.html        Certificado del alumno
+verificar.html          Verificación pública de certificados
 assets/curso/           Índice, clase de muestra y curso cifrado
 cursos/roblox-luau.html Landing de venta del curso de Roblox
 legal/                  Términos, privacidad, reembolsos, arrepentimiento y baja
@@ -22,13 +25,27 @@ assets/css/duvna.css    Estilos
 supabase/               Base de datos para cuando se sumen las cuentas
 ```
 
-## Aula (versión preview, sin base de datos)
+## Cómo funciona la venta (sin base de datos)
 
-- `aula.html` muestra el curso. Sin código, se ve solo la **clase 1.1** de muestra; el resto aparece bloqueado.
-- `acceso.html` pide nombre y **código de acceso**. Con el código correcto se habilitan las 41 clases.
-- El curso está **cifrado** en `assets/curso/curso.enc.json` (AES-256). Aunque el repo sea público, sin el código no se puede leer.
-- El progreso de cada alumno (clases completadas) se guarda en su navegador.
-- Es un solo código para todos los alumnos: se lo mandás por email cuando pagan. Si se filtra, se genera un código nuevo y se vuelve a cifrar el curso (pedíselo a Claude).
+1. **Inscripción** (`inscripcion.html`): el alumno pone nombre y email, acepta términos y paga con el link de Mercado Pago de `config.js` (`checkoutUrl`). Si el link está vacío, el pedido llega por WhatsApp o email.
+2. **Acceso** (`acceso.html`): vos le mandás el código de acceso por email. Con ese código se desbloquean las 41 clases en `aula.html`.
+3. **Certificado** (`certificado.html`): al marcar todas las clases, el alumno ve su certificado con código. Si pide registrarlo, se agrega a `assets/curso/certificados.json` y queda verificable en `verificar.html`.
+
+- El curso viaja **cifrado** (AES-256) en `assets/curso/curso.enc.json`: sin el código no se puede leer.
+- Los registros de certificados también están cifrados: sin el código de cada certificado no se ven nombres.
+- **Rotá el código de acceso una vez por mes** y mandáselo solo a quienes siguen pagando: así, quien se da de baja deja de tener acceso.
+- Los pedidos de baja y arrepentimiento llegan por WhatsApp o email con un código de constancia. Respondelos dentro de las 24 horas.
+
+## Datos para completar en `assets/js/config.js`
+
+| Dato | Para qué |
+|---|---|
+| `checkoutUrl` | Link de pago o suscripción de Mercado Pago |
+| `EMAIL_CONTACTO` | Email que recibe inscripciones y pedidos |
+| `WHATSAPP` | Número con código de país, solo dígitos. Activa el botón de chat |
+| `INSTAGRAM`, `TIKTOK` | Usuarios, sin @. Aparecen en el pie |
+| `CUIT`, `DOMICILIO` | Obligatorios por la Ley de Defensa del Consumidor |
+| `SITE_URL` | Cambialo cuando tengas el dominio propio |
 
 **Cuentas de alumnos, panel, clases y certificados** están guardados en la rama `login` del repositorio, listos para sumarlos más adelante. Por ahora la web es solo de venta:
 

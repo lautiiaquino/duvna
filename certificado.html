@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tu certificado | Duvna Academy</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/img/icono-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/duvna.css">
+  <style>
+    .diploma {
+      max-width: 1000px; margin: 0 auto; aspect-ratio: 1.414 / 1; background: #ffffff; color: #0f1a14;
+      border: 1px solid #cfdcd3; border-radius: 18px; outline: 3px solid #22c55e; outline-offset: -20px;
+      box-shadow: 12px 12px 0 #d6e3da; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; text-align: center; padding: 6% 9%; position: relative; overflow: hidden;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .diploma::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22260%22%20height%3D%22140%22%3E%3Ctext%20x%3D%2210%22%20y%3D%2290%22%20transform%3D%22rotate%28-20%20130%2070%29%22%20font-family%3D%22Arial%2C%20sans-serif%22%20font-weight%3D%22800%22%20font-size%3D%2234%22%20letter-spacing%3D%226%22%20fill%3D%22%230f1a14%22%20fill-opacity%3D%220.045%22%3EDUVNA%3C/text%3E%3C/svg%3E"); background-repeat: repeat;
+    }
+    .diploma > * { position: relative; }
+    .diploma .org { display: inline-flex; align-items: center; gap: 10px; font: 700 clamp(1rem, 2.2vw, 1.4rem) var(--display); letter-spacing: -0.02em; }
+    .diploma .org .brand-mark { width: 30px; height: 30px; padding: 6px; }
+    .diploma .rule { width: 72px; height: 6px; border-radius: 3px; background: #22c55e; margin: 18px auto; }
+    .diploma .lead { color: #56645b; margin: 0 auto; }
+    .diploma .name { font: 800 clamp(1.7rem, 5vw, 3.1rem) var(--display); letter-spacing: -0.035em; margin: 10px 0; line-height: 1.1; }
+    .diploma .curso { font-weight: 800; font-size: clamp(1rem, 2.2vw, 1.4rem); margin: 6px auto 0; max-width: 34ch; }
+    .diploma .foot { display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-top: auto; padding-top: 24px; font-size: .85rem; text-align: left; gap: 16px; }
+    .diploma .sign { border-top: 2px solid #0f1a14; padding-top: 6px; min-width: 190px; font-weight: 700; }
+    .diploma .sign span { font-weight: 500; color: #56645b; }
+    .diploma .verify { font-family: var(--mono); font-size: .74rem; color: #56645b; text-align: right; }
+    .diploma .verify p { margin: 0 0 0 auto; }
+    @media (max-width: 640px) { .diploma { aspect-ratio: auto; min-height: 420px; padding: 44px 26px; } .diploma .foot { flex-direction: column; align-items: flex-start; } .diploma .verify { text-align: left; } .diploma .verify p { margin: 0; } }
+    .cert-acciones { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 28px 0 8px; }
+    .cert-estado { max-width: 640px; margin: 18px auto 0; text-align: center; }
+    @media print {
+      @page { size: A4 landscape; margin: 0; }
+      .site-header, .site-footer, .cert-acciones, .cert-estado, .wa-float, #msg { display: none !important; }
+      .section { padding: 0 !important; }
+      .diploma { box-shadow: none; border-radius: 0; max-width: none; width: 100vw; height: 100vh; aspect-ratio: auto; }
+    }
+  </style>
+  <script type="module" src="assets/js/app.js"></script>
+</head>
+<body data-sin-chat>
+  <header id="site-header" class="site-header"></header>
+  <main class="section">
+    <div class="wrap">
+      <div id="msg" class="msg" role="status" aria-live="polite"></div>
+      <div id="out"></div>
+    </div>
+  </main>
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <script type="module">
+    import { CONFIG, esc, linkMensaje } from "./assets/js/app.js";
+    import { accesoGuardado, cargarIndice, progreso, codigoCertificado, buscarCertificado, fechaFinalizacion, guardarFinalizacion } from "./assets/js/aula.js";
+
+    const out = document.getElementById("out");
+    const acceso = accesoGuardado();
+    const indice = await cargarIndice();
+    const todas = indice.unidades.flatMap(u => u.clases.map(c => c.id));
+    const hechas = progreso();
+    const faltan = todas.filter(id => !hechas.has(id)).length;
+
+    if (!acceso?.codigo) {
+      out.innerHTML = `<div class="locked"><h1>Tu certificado</h1><p class="muted">Ingresá con tu código de acceso para ver tu certificado.</p><a class="btn btn-primary" href="acceso.html">Ingresar</a></div>`;
+    } else if (faltan > 0) {
+      out.innerHTML = `<div class="locked"><h1>Casi llegás</h1><p class="muted">Te ${faltan === 1 ? "falta 1 clase" : `faltan ${faltan} clases`} para obtener tu certificado. Marcá cada clase como completada cuando la termines.</p><a class="btn btn-primary" href="aula.html">Seguir con el curso</a></div>`;
+    } else {
+      let fecha = fechaFinalizacion();
+      if (!fecha) { fecha = new Date().toISOString().slice(0, 10); guardarFinalizacion(fecha); }
+      const curso = CONFIG.CURSOS["roblox-luau"].titulo;
+      const codigo = await codigoCertificado(acceso.nombre, "roblox-luau", fecha);
+      const fechaTexto = new Date(fecha + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
+      const verifyUrl = new URL(`verificar.html?codigo=${codigo}`, CONFIG.SITE_URL).href;
+      const registrado = !!(await buscarCertificado(codigo));
+
+      out.innerHTML = `
+        <section class="diploma" aria-label="Certificado de finalización">
+          <div class="org"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>duvna academy</div>
+          <div class="rule"></div>
+          <p class="lead">Certifica que</p>
+          <div class="name">${esc(acceso.nombre)}</div>
+          <p class="lead">completó las 41 clases del curso</p>
+          <p class="curso">${esc(curso)}</p>
+          <div class="foot">
+            <div class="sign">${esc(CONFIG.TITULAR)}<br><span>Fundador, Duvna Academy</span></div>
+            <div class="verify"><p>Emitido el ${fechaTexto}</p><p>Código ${codigo}</p><p>${esc(verifyUrl.replace(/^https?:\/\//, "").replace(/\?.*/, ""))}</p></div>
+          </div>
+        </section>
+        <div class="cert-acciones">
+          <button class="btn btn-primary" type="button" onclick="window.print()">Imprimir o guardar en PDF</button>
+          ${registrado ? `<a class="btn btn-ghost" href="${esc(verifyUrl)}">Ver verificación</a>` : ""}
+        </div>
+        <div class="cert-estado">${registrado
+          ? `<p class="small muted">Tu certificado está registrado: cualquiera puede comprobarlo con el código <b>${codigo}</b>.</p>`
+          : `<p class="small muted">Para que tu certificado se pueda verificar públicamente, pedí su registro. Lo hacemos dentro de las ${CONFIG.HORAS_RESPUESTA} horas.</p>
+             <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="${linkMensaje("Registrar mi certificado", `Nombre: ${acceso.nombre}\nCurso: ${curso}\nFecha: ${fecha}\nCódigo: ${codigo}`)}">Registrar mi certificado</a>`}
+          <p class="small muted" style="margin-top:14px">Certificado privado de finalización. No es un título oficial. Revisá tu nombre: si está mal, volvé a ingresar con el nombre correcto.</p>
+        </div>`;
+    }
+  </script>
+</body>
+</html>

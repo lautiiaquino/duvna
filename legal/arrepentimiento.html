@@ -35,32 +35,40 @@
         <button class="btn btn-dark" type="submit">Enviar pedido de arrepentimiento</button>
       </form>
       <script type="module">
-        import { supabase, CONFIG, showMsg, getSession } from "../assets/js/app.js";
+        import { CONFIG, esc, showMsg, linkWhatsApp, linkEmail } from "../assets/js/app.js";
         const msg = document.getElementById("msg");
         const form = document.getElementById("req-form");
-        const ready = !!supabase;
-        const session = ready ? await getSession() : null;
-        if (session) document.getElementById("r-email").value = session.user.email;
+        const salida = document.createElement("div");
+        form.appendChild(salida);
 
-        form.addEventListener("submit", async (e) => {
+        // Código de constancia: lo ves en el momento y viaja dentro del pedido.
+        function constancia() {
+          const letras = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+          const r = crypto.getRandomValues(new Uint8Array(8));
+          const t = [...r].map(n => letras[n % letras.length]).join("");
+          return `ARR-${t.slice(0, 4)}-${t.slice(4)}`;
+        }
+
+        form.addEventListener("submit", (e) => {
           e.preventDefault();
           const name = document.getElementById("r-name").value.trim();
           const email = document.getElementById("r-email").value.trim();
           const detail = document.getElementById("r-detail").value.trim();
           if (!name || !email) return showMsg(msg, "err", "Completá tu nombre y tu email.");
-          if (!ready) {
-            // Sin servidor conectado, el pedido sale por email al titular.
-            const body = `Nombre: ${name}\nEmail: ${email}\n\n${detail}`;
-            location.href = `mailto:${CONFIG.EMAIL_CONTACTO}?subject=${encodeURIComponent("Arrepentimiento de compra")}&body=${encodeURIComponent(body)}`;
-            return showMsg(msg, "ok", `Se abrió tu correo con el pedido listo para enviar. Si no se abrió, escribí a ${CONFIG.EMAIL_CONTACTO} con el asunto "Arrepentimiento de compra" y tu nombre. Te respondemos con la confirmación.`);
-          }
-          const btn = form.querySelector("button");
-          btn.disabled = true;
-          const { data, error } = await supabase.rpc("submit_request", { p_type: "arrepentimiento", p_email: email, p_name: name, p_detail: detail });
-          btn.disabled = false;
-          if (error) return showMsg(msg, "err", error.message);
-          showMsg(msg, "ok", `Recibimos tu pedido de arrepentimiento. Tu código de constancia es ${data}. Guardalo: te vamos a escribir a tu email para confirmar el reintegro.`);
-          form.querySelectorAll("input, textarea, button").forEach(el => el.disabled = true);
+          if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showMsg(msg, "err", "Revisá tu email: tiene que tener la forma nombre@ejemplo.com.");
+
+          const codigo = constancia();
+          const fecha = new Date().toLocaleString("es-AR");
+          const cuerpo = `Pedido: Arrepentimiento de compra\nCódigo de constancia: ${codigo}\nFecha: ${fecha}\nNombre: ${name}\nEmail: ${email}\n\n${detail}`;
+          const wa = linkWhatsApp(cuerpo);
+          const em = linkEmail(`Arrepentimiento de compra ${codigo}`, cuerpo);
+
+          showMsg(msg, "ok", `Tu código de constancia es ${codigo}. Guardalo. Ahora enviá el pedido con uno de los botones: te confirmamos dentro de las ${CONFIG.HORAS_RESPUESTA} horas. Te reintegramos el total por el mismo medio de pago.`);
+          salida.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px">
+            ${wa ? `<a class="btn btn-primary" href="${wa}" target="_blank" rel="noopener">Enviar por WhatsApp</a>` : ""}
+            <a class="btn ${wa ? "btn-ghost" : "btn-primary"}" href="${em}">Enviar por email</a></div>
+            <p class="small muted" style="margin-top:12px">Si no se abre ninguna app, escribí a <b>${esc(CONFIG.EMAIL_CONTACTO)}</b> con el asunto "Arrepentimiento de compra ${codigo}".</p>`;
+          form.querySelector('button[type="submit"]').disabled = true;
         });
       </script>
     </div>

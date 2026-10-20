@@ -7,6 +7,8 @@
   <meta name="robots" content="noindex">
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/img/icono-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
@@ -24,6 +26,7 @@
         <p class="small muted" id="progreso-texto">Cargando…</p>
       </div>
       <div id="indice"></div>
+      <p style="padding:16px 22px 0" id="cert-link" hidden><a class="btn btn-primary btn-sm btn-block" href="certificado.html">Obtener mi certificado</a></p>
       <p class="small" style="padding:18px 22px 0" id="sesion"></p>
     </nav>
 
@@ -107,6 +110,7 @@
       const total = completo ? lista.length : 1;
       const n = lista.filter(c => clases[c.id] && hechas.has(c.id)).length;
       document.getElementById("barra").style.width = `${Math.round((n / total) * 100)}%`;
+      document.getElementById("cert-link").hidden = !(completo && n === total);
       document.getElementById("progreso-texto").textContent = completo
         ? `${n} de ${total} clases completadas`
         : "Clase de muestra gratis";
@@ -147,8 +151,24 @@
       const aSig = document.getElementById("siguiente");
       aAnt.style.visibility = ant ? "visible" : "hidden";
       if (ant) aAnt.href = `#${ant.id}`;
-      if (sig) { aSig.href = `#${sig.id}`; aSig.textContent = "Siguiente clase"; }
-      else { aSig.href = "#"; aSig.textContent = "¡Terminaste el curso!"; }
+      if (sig && !completo) { aSig.href = `inscripcion.html?curso=roblox-luau`; aSig.textContent = "Quiero el curso completo"; }
+      else if (sig) { aSig.href = `#${sig.id}`; aSig.textContent = "Siguiente clase"; }
+      else { aSig.href = "certificado.html"; aSig.textContent = "Ver mi certificado"; }
+
+      leccion.querySelectorAll(".hl").forEach(bloque => {
+        const copiar = document.createElement("button");
+        copiar.type = "button";
+        copiar.className = "copiar";
+        copiar.textContent = "Copiar";
+        copiar.onclick = async () => {
+          const texto = bloque.querySelector("pre").innerText;
+          try { await navigator.clipboard.writeText(texto); copiar.textContent = "Copiado"; }
+          catch { copiar.textContent = "Seleccioná y copiá"; }
+          setTimeout(() => (copiar.textContent = "Copiar"), 1800);
+        };
+        bloque.appendChild(copiar);
+      });
+      if (completo) { try { localStorage.setItem("duvna_ultima", id); } catch {} }
 
       const boton = document.getElementById("hecho");
       const pintar = () => { boton.textContent = progreso().has(id) ? "Completada ✓" : "Marcar como completada"; };
@@ -165,7 +185,8 @@
 
     leccion.addEventListener("contextmenu", (e) => { if (!e.target.closest("pre")) e.preventDefault(); });
     window.addEventListener("hashchange", () => mostrar(location.hash.slice(1)));
-    mostrar(location.hash.slice(1) || indice.muestra);
+    const ultima = (() => { try { return localStorage.getItem("duvna_ultima"); } catch { return null; } })();
+    mostrar(location.hash.slice(1) || (completo && ultima) || indice.muestra);
   </script>
 </body>
 </html>

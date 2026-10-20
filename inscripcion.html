@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inscripción | Duvna Academy</title>
+  <meta name="description" content="Inscribite al curso de programación de juegos en Roblox con Luau.">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/duvna.css">
+  <script type="module" src="assets/js/app.js"></script>
+</head>
+<body>
+  <header id="site-header" class="site-header"></header>
+
+  <main class="section">
+    <div class="wrap insc">
+      <div class="insc-main">
+        <h1>Tu inscripción</h1>
+        <p class="muted">Tres pasos y empezás. Te mandamos tu código de acceso dentro de las <span id="horas">24</span> horas de confirmado el pago.</p>
+
+        <ol class="insc-pasos">
+          <li class="insc-paso" id="paso1">
+            <h2>Tus datos</h2>
+            <form id="datos" novalidate>
+              <div id="msg" class="msg" role="status" aria-live="polite"></div>
+              <div class="field">
+                <label for="nombre">Nombre y apellido</label>
+                <input id="nombre" type="text" autocomplete="name" maxlength="80" required>
+                <p class="hint">Así va a figurar en tu certificado.</p>
+              </div>
+              <div class="field">
+                <label for="email">Email</label>
+                <input id="email" type="email" autocomplete="email" required>
+                <p class="hint">Ahí te mandamos tu código de acceso.</p>
+              </div>
+              <label class="check">
+                <input id="terminos" type="checkbox" required>
+                <span>Leí y acepto los <a href="legal/terminos.html" target="_blank">términos y condiciones</a>, la <a href="legal/privacidad.html" target="_blank">política de privacidad</a> y la <a href="legal/reembolsos.html" target="_blank">política de reembolsos</a>. Si soy menor de 18 años, cuento con la autorización de mi madre, padre o tutor, que es quien realiza el pago.</span>
+              </label>
+              <button class="btn btn-primary btn-block" type="submit">Continuar al pago</button>
+            </form>
+          </li>
+
+          <li class="insc-paso" id="paso2" aria-disabled="true">
+            <h2>Pagá la suscripción</h2>
+            <div id="pago"></div>
+          </li>
+
+          <li class="insc-paso" id="paso3" aria-disabled="true">
+            <h2>Recibí tu código</h2>
+            <div id="confirmar"></div>
+          </li>
+        </ol>
+      </div>
+
+      <aside class="insc-resumen">
+        <div class="offer">
+          <div class="label">Resumen</div>
+          <h3 id="titulo" style="margin:8px 0 0">Programación de juegos en Roblox con Luau</h3>
+          <div class="price"><span data-price="roblox-luau">ARS 4.999</span></div>
+          <div class="price-period"><span data-period="roblox-luau">por mes</span>, se renueva automáticamente</div>
+          <ul class="checks" style="margin-top:18px">
+            <li>10 unidades y 41 clases</li>
+            <li>Código, ejercicios y soluciones</li>
+            <li>Certificado de finalización</li>
+            <li>Garantía de 10 días</li>
+          </ul>
+          <p class="fine">Te das de baja cuando quieras con el <a href="legal/baja.html">botón de baja</a>.</p>
+        </div>
+        <p class="small muted" style="margin-top:16px">¿Querés ver cómo son las clases antes de pagar? <a href="aula.html">Mirá la primera gratis</a>.</p>
+      </aside>
+    </div>
+  </main>
+
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <script type="module">
+    import { CONFIG, esc, showMsg, linkMensaje, linkEmail, linkWhatsApp } from "./assets/js/app.js";
+
+    const id = new URLSearchParams(location.search).get("curso") || "roblox-luau";
+    const curso = CONFIG.CURSOS[id] || CONFIG.CURSOS["roblox-luau"];
+    document.getElementById("titulo").textContent = curso.titulo;
+    document.getElementById("horas").textContent = CONFIG.HORAS_RESPUESTA;
+
+    const msg = document.getElementById("msg");
+    const pasos = [1, 2, 3].map(n => document.getElementById(`paso${n}`));
+    const activar = (n) => pasos.forEach((p, i) => {
+      p.setAttribute("aria-disabled", String(i + 1 > n));
+      p.classList.toggle("hecho", i + 1 < n);
+    });
+
+    // Recordar los datos mientras completa la inscripción
+    const guardado = (() => { try { return JSON.parse(sessionStorage.getItem("duvna_insc") || "{}"); } catch { return {}; } })();
+    if (guardado.nombre) document.getElementById("nombre").value = guardado.nombre;
+    if (guardado.email) document.getElementById("email").value = guardado.email;
+
+    document.getElementById("datos").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const nombre = document.getElementById("nombre").value.trim();
+      const email = document.getElementById("email").value.trim();
+      if (nombre.length < 3) return showMsg(msg, "err", "Escribí tu nombre y apellido.");
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showMsg(msg, "err", "Revisá tu email: tiene que tener la forma nombre@ejemplo.com.");
+      if (!document.getElementById("terminos").checked) return showMsg(msg, "err", "Para seguir tenés que aceptar los términos y las políticas.");
+      msg.className = "msg"; msg.textContent = "";
+      try { sessionStorage.setItem("duvna_insc", JSON.stringify({ nombre, email })); } catch {}
+
+      const detalle = `Nombre: ${nombre}\nEmail: ${email}\nCurso: ${curso.titulo}\nPrecio: ${curso.precio} ${curso.periodo}`;
+      const pago = document.getElementById("pago");
+      const confirmar = document.getElementById("confirmar");
+
+      if (curso.checkoutUrl) {
+        pago.innerHTML = `
+          <p class="muted">Se abre Mercado Pago en otra pestaña. Podés pagar con tarjeta, dinero en cuenta u otros medios que ofrezca Mercado Pago.</p>
+          <a class="btn btn-primary btn-lg" id="ir-pago" href="${esc(curso.checkoutUrl)}" target="_blank" rel="noopener">Pagar ${esc(curso.precio)} con Mercado Pago</a>`;
+        confirmar.innerHTML = `
+          <p class="muted">Cuando termines de pagar, avisanos así te mandamos tu código de acceso. Si podés, adjuntá el comprobante.</p>
+          <a class="btn btn-ghost" href="${linkMensaje("Ya pagué mi inscripción", detalle)}" target="_blank" rel="noopener">Avisar que ya pagué</a>`;
+        activar(2);
+        document.getElementById("ir-pago").addEventListener("click", () => activar(3));
+      } else {
+        pago.innerHTML = `
+          <p class="muted">Estamos terminando de habilitar el pago online. Mandanos tu pedido y te respondemos con el link de pago de Mercado Pago dentro de las ${CONFIG.HORAS_RESPUESTA} horas.</p>
+          <a class="btn btn-primary btn-lg" id="ir-pago" href="${linkMensaje("Quiero inscribirme", detalle)}" target="_blank" rel="noopener">Enviar mi pedido de inscripción</a>`;
+        confirmar.innerHTML = `<p class="muted">Cuando se acredite el pago, te llega a <b>${esc(email)}</b> tu código de acceso. Con ese código entrás al curso desde <a href="acceso.html">Ingresar</a>.</p>`;
+        activar(2);
+        document.getElementById("ir-pago").addEventListener("click", () => activar(3));
+      }
+      pasos[1].scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    activar(1);
+  </script>
+</body>
+</html>

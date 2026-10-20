@@ -64,3 +64,45 @@ export async function abrirCurso(codigo) {
   cache = { codigo: normalizar(codigo), clases };
   return clases;
 }
+
+// ---------- Certificados ----------
+// Código del certificado: se calcula a partir del nombre, el curso y la fecha,
+// así siempre sale el mismo para el mismo alumno.
+export async function codigoCertificado(nombre, curso, fecha) {
+  const datos = new TextEncoder().encode(`${nombre.trim().toLowerCase()}|${curso}|${fecha}`);
+  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", datos));
+  const hex = [...hash.slice(0, 4)].map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+  return `DUV-${hex.slice(0, 4)}-${hex.slice(4, 8)}`;
+}
+
+// Certificados registrados. El archivo público no muestra nombres: cada registro
+// está cifrado con su propio código, así que solo se puede leer teniendo el código.
+async function sha256(texto) {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto)));
+}
+const hex = (bytes) => [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
+
+export async function buscarCertificado(codigo) {
+  codigo = normalizar(codigo);
+  let lista = [];
+  try {
+    const r = await fetch(`${BASE}assets/curso/certificados.json`, { cache: "no-store" });
+    lista = await r.json();
+  } catch {
+    return null;
+  }
+  const id = hex(await sha256(`duvna-id|${codigo}`));
+  const entrada = lista.find(e => e.id === id);
+  if (!entrada) return null;
+  const clave = await crypto.subtle.importKey("raw", await sha256(`duvna-cert|${codigo}`), "AES-GCM", false, ["decrypt"]);
+  try {
+    const plano = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(entrada.iv) }, clave, b64(entrada.datos));
+    return JSON.parse(new TextDecoder().decode(plano));
+  } catch {
+    return null;
+  }
+}
+
+const CLAVE_FIN = "duvna_fin";
+export function fechaFinalizacion() { return leer(CLAVE_FIN, null); }
+export function guardarFinalizacion(fecha) { escribir(CLAVE_FIN, fecha); }
