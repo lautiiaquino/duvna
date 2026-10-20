@@ -217,3 +217,16 @@ function renderConfigFields() {
 renderHeader();
 renderPrices();
 renderWhatsApp();
+
+// Animación suave al aparecer cada bloque (solo en las páginas de venta)
+(function revelar() {
+  if (!("IntersectionObserver" in window)) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const sel = ".hitos li, .pains > div, .modules details, .galeria figure, .steps li, .course, .faq details, .includes li, .build li";
+  const els = [...document.querySelectorAll(sel)].filter(el => el.getBoundingClientRect().top > innerHeight);
+  if (!els.length) return;
+  const io = new IntersectionObserver((entradas) => {
+    entradas.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("visto"); io.unobserve(e.target); } });
+  }, { rootMargin: "0px 0px -8% 0px" });
+  els.forEach((el, i) => { el.classList.add("revelar"); el.style.transitionDelay = `${(i % 3) * 70}ms`; io.observe(el); });
+})();

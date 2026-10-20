@@ -717,3 +717,82 @@ h2 { letter-spacing: -0.035em; }
 @media (max-width: 900px) { .hero-home .studio { transform: none; } }
 .course { box-shadow: var(--soft); transition: transform .2s, box-shadow .2s; }
 .course.is-open:hover { transform: translateY(-3px); box-shadow: var(--lift); }
+
+/* ================= Más llamativa (v3) ================= */
+/* Barra de anuncio */
+.anuncio { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; padding: 10px 16px;
+  background: linear-gradient(90deg, #14532d, #15803d 50%, #14532d); background-size: 200% 100%; animation: anuncio-mov 8s linear infinite;
+  color: #ecfdf3; font-size: .92rem; text-align: center; text-decoration: none; }
+.anuncio:hover { color: #fff; }
+.anuncio b { color: #fff; }
+.anuncio-sep { opacity: .6; }
+.anuncio-cta { font-weight: 700; color: #86efac; margin-left: 4px; }
+.anuncio-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 0 rgba(74, 222, 128, .7); animation: pulso 1.8s infinite; }
+@keyframes anuncio-mov { to { background-position: -200% 0; } }
+@keyframes pulso { 0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, .7); } 70% { box-shadow: 0 0 0 9px rgba(74, 222, 128, 0); } 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
+@media (max-width: 560px) { .anuncio-sep, .anuncio > span:nth-of-type(3) { display: none; } }
+
+/* Pill con punto en vivo */
+.pill-live { display: inline-flex; align-items: center; gap: 8px; }
+.pill-live i { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulso 1.8s infinite; }
+
+/* Palabra resaltada del título */
+.resalte { position: relative; white-space: nowrap; color: var(--sun);
+  background: linear-gradient(transparent 62%, rgba(74, 222, 128, .38) 62%, rgba(74, 222, 128, .38) 92%, transparent 92%) no-repeat 0 0 / 0% 100%;
+  animation: marcar 1s .35s cubic-bezier(.2, .7, .2, 1) forwards; }
+@keyframes marcar { to { background-size: 100% 100%; } }
+@media (max-width: 420px) { .resalte { white-space: normal; } }
+
+/* Etiquetas flotando sobre la captura */
+.flota { position: absolute; z-index: 3; display: flex; align-items: center; gap: 8px; padding: 9px 14px 9px 10px; background: #fff;
+  border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--lift); font-weight: 700; font-size: .9rem; color: var(--text);
+  animation: flotar 5s ease-in-out infinite; }
+.flota span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: #ecf7ef; font-size: 1rem; }
+.flota-1 { top: -22px; right: 4%; }
+.flota-2 { top: 30%; right: -26px; animation-delay: -1.6s; }
+.flota-3 { top: 52%; left: -34px; animation-delay: -3.2s; }
+@keyframes flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+@media (max-width: 900px) {
+  .flota { font-size: .8rem; padding: 6px 10px 6px 7px; }
+  .flota span { width: 24px; height: 24px; font-size: .85rem; }
+  .flota-1 { top: -14px; left: 6px; }
+  .flota-2 { top: 18%; right: 6px; }
+  .flota-3 { display: none; }
+}
+
+/* Cinta en movimiento */
+.cinta { overflow: hidden; background: #0f2e1b; color: #dcfce7; padding: 16px 0; border-block: 1px solid #14532d; }
+.cinta-pista { display: flex; width: max-content; animation: cinta 38s linear infinite; }
+.cinta ul { display: flex; list-style: none; margin: 0; padding: 0; }
+.cinta li { display: flex; align-items: center; gap: 22px; padding-right: 22px; font: 700 clamp(1rem, 2vw, 1.25rem) var(--display); letter-spacing: -0.01em; white-space: nowrap; }
+.cinta li::after { content: ""; width: 10px; height: 10px; border-radius: 3px; background: #22c55e; transform: rotate(45deg); }
+.cinta:hover .cinta-pista { animation-play-state: paused; }
+@keyframes cinta { to { transform: translateX(-50%); } }
+
+/* Lo que vas a construir */
+.kicker { display: inline-block; font: 700 .78rem var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--sun); margin-bottom: 10px; }
+.hitos { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; counter-reset: none; }
+.hitos li { position: relative; overflow: hidden; background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 26px 24px 24px; box-shadow: var(--soft); transition: transform .25s, box-shadow .25s, border-color .25s; }
+.hitos li:hover { transform: translateY(-4px); box-shadow: var(--lift); border-color: rgba(21, 128, 61, .35); }
+.hito-n { position: absolute; top: 10px; right: 16px; font: 800 3.4rem/1 var(--display); color: #ecf7ef; letter-spacing: -0.04em; }
+.hito-e { position: relative; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 15px; background: linear-gradient(135deg, #dcfce7, #bbf7d0); font-size: 1.5rem; margin-bottom: 16px; }
+.hitos b { position: relative; display: block; font: 700 1.12rem var(--display); letter-spacing: -0.01em; margin-bottom: 6px; }
+.hitos p { position: relative; margin: 0; color: var(--muted); font-size: .97rem; }
+.hitos .hito-final { background: linear-gradient(135deg, #14532d, #15803d 60%, #16a34a); border-color: transparent; }
+.hitos .hito-final b { color: #fff; }
+.hitos .hito-final p { color: #dcfce7; }
+.hitos .hito-final .hito-n { color: rgba(255, 255, 255, .12); }
+.hitos .hito-final .hito-e { background: rgba(255, 255, 255, .16); }
+.construir-cta { max-width: none; width: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 36px 0 0; }
+@media (max-width: 900px) { .hitos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .hitos { grid-template-columns: minmax(0, 1fr); } }
+
+/* Aparecer al hacer scroll */
+.revelar { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+.revelar.visto { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anuncio, .anuncio-dot, .pill-live i, .flota, .cinta-pista { animation: none; }
+  .resalte { animation: none; background-size: 100% 100%; }
+  .revelar { opacity: 1; transform: none; transition: none; }
+}
