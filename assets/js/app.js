@@ -94,6 +94,7 @@ export function authError(err) {
   if (m.includes("already registered")) return "Ya existe una cuenta con ese email. Probá ingresar.";
   if (m.includes("password") && m.includes("6")) return "La contraseña tiene que tener al menos 8 caracteres.";
   if (m.includes("email not confirmed")) return "Confirmá tu email con el enlace que te enviamos antes de ingresar.";
+  if (m.includes("signups") && m.includes("disabled")) return "Por ahora no se pueden crear cuentas nuevas. Escribinos y te ayudamos.";
   if (m.includes("rate limit")) return "Hiciste muchos intentos seguidos. Esperá unos minutos y probá de nuevo.";
   return err?.message || "Algo falló. Probá de nuevo.";
 }
