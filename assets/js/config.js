@@ -27,7 +27,7 @@ export const CONFIG = {
     },
   },
 
-  // Sistema de cuentas (todavía no se usa: la versión con login está en la rama "login").
-  SUPABASE_URL: "https://TU-PROYECTO.supabase.co",
-  SUPABASE_ANON_KEY: "TU-ANON-KEY",
+  // Supabase: solo la URL del proyecto y la clave pública (anon). Nunca la secret ni la service_role.
+  SUPABASE_URL: "https://jcquzmfmwjapwneuncpx.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjcXV6bWZtd2phcHduZXVuY3B4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1ODgyNjAsImV4cCI6MjEwODE2NDI2MH0.Pk-OkftS31JxIcg1zrMHWIqTv6iiMdFdQYWIQjdCD_Y",
 };
